@@ -1,0 +1,30 @@
+# Keep the build context small and secrets out of the image.
+.env
+.env.*
+*.env
+
+# VCS / editor / OS cruft
+.git
+.gitignore
+.vscode
+.idea
+*.swp
+.DS_Store
+
+# Local build output / caches
+/bin
+/dist
+/tmp
+*.exe
+*.test
+*.out
+coverage.*
+
+# Docs & tooling that don't belong in the build
+docs
+*.md
+Makefile
+dev.ps1
+
+# Air hot-reload config (dev only)
+.air.toml

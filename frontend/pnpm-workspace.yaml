@@ -1,0 +1,12 @@
+# pnpm settings (pnpm 11 reads config from here, not package.json).
+
+# Supply-chain hardening: refuse dependency versions published less than
+# this many minutes ago (1440 = 24h), blunting "malicious version published
+# minutes ago" attacks.
+minimumReleaseAge: 1440
+
+# Install/build scripts are blocked by default. Only these trusted packages
+# are allowed to run them. esbuild is Vite's bundler and needs its postinstall
+# to link its native binary.
+allowBuilds:
+  esbuild: true

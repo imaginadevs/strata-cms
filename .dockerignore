@@ -1,0 +1,36 @@
+# Build-context excludes for the general (root) Dockerfile.
+# Keeps host node_modules/dist and secrets out of the image, and forces deps to
+# be (re)installed inside the Linux build stage.
+
+# Dependencies — host binaries are the wrong platform (Windows), reinstalled in-image.
+**/node_modules
+
+# Build outputs
+frontend/dist
+/app
+bin
+
+# Embedded SPA target — repopulated at build time from the frontend stage.
+backend/internal/infrastructure/static/dist
+
+# Secrets / env — runtime config comes from container env, never baked into the image.
+.env
+.env.*
+!.env.example
+
+# VCS / tooling / editors
+.git
+.gitignore
+.claude
+.vscode
+.idea
+
+# Docker
+Dockerfile
+.dockerignore
+
+# Go tmp / logs / OS cruft
+backend/tmp
+**/*.log
+.DS_Store
+Thumbs.db

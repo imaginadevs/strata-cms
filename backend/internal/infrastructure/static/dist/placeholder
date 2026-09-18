@@ -1,0 +1,7 @@
+This directory is populated with the built frontend (frontend/dist) at Docker
+build time — see the root Dockerfile's `COPY --from=frontend-builder ... dist`.
+
+The committed placeholder only ensures `//go:embed all:dist` has a file to embed
+for local/API-only builds. When no index.html is embedded, the server runs
+API-only and the SPA is served elsewhere (Vite dev server, or a build that
+embeds the real dist).

@@ -1,0 +1,48 @@
+# Binaries
+bin/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Backend
+backend/tmp/
+backend/*.env
+
+
+
+# Frontend
+frontend/dist/
+
+# Embedded SPA (placeholder is committed; production assets are copied at build)
+backend/internal/infrastructure/static/dist/*
+!backend/internal/infrastructure/static/dist/placeholder
+frontend/node_modules/
+frontend/.env.local
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# Logs
+*.log
+logs/
+
+# Docker
+.docker/
+
+# Test coverage
+coverage/
+*.out
+
+# OS
+Thumbs.db
