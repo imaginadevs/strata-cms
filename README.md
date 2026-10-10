@@ -1,8 +1,19 @@
-# CMS
+<p align="center">
+  <img src="assets/branding/logo-stack-lockup.svg" alt="Strata" width="300" />
+</p>
 
-A high-performance, **open-source** (MIT) headless CMS written in Go with a React admin interface. Built for multi-tenant, white-label deployments with an AI-first, event-driven architecture.
 
-Made by [Imagina Colombia](https://imaginacolombia.com).
+<p align="center">
+  A high-performance, <strong>open-source</strong> (MIT) headless CMS written in Go with a React admin interface.<br />
+  Built for multi-tenant, white-label deployments with an AI-first, event-driven architecture.
+</p>
+
+
+<p align="center">
+  Made with Strata · <a href="https://www.imaginacolombia.com/">Imagina Colombia</a>
+</p>
+
+# Strata
 
 ## License
 
@@ -10,7 +21,7 @@ This project is open source under the [MIT License](LICENSE).
 
 ## Infrastructure & deployment
 
-Self-hosting is fully supported. If you need managed infrastructure, production deployment, or hosting support, contact [ventas@imaginacolombia.com](mailto:ventas@imaginacolombia.com).
+Self-hosting is fully supported. If you need managed infrastructure, production deployment, or hosting support, visit [Imagina Colombia](https://www.imaginacolombia.com/) or contact [ventas@imaginacolombia.com](mailto:ventas@imaginacolombia.com).
 
 ## Stack
 
@@ -31,7 +42,7 @@ Self-hosting is fully supported. If you need managed infrastructure, production 
 
 ```bash
 # 1 — clone and install
-git clone <repo-url> cms && cd cms
+git clone <repo-url> strata && cd strata
 make setup          # copies .env.example → .env and installs deps
 
 # 2 — edit credentials
@@ -66,7 +77,7 @@ See [docs/Architecture.md](docs/Architecture.md) for the full architectural refe
 ## Project layout
 
 ```
-cms/
+strata/
 ├── backend/                  Go service
 │   ├── cmd/server/           Entry point
 │   ├── internal/

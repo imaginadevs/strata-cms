@@ -12,6 +12,16 @@ furnished to do so, subject to the following conditions:
 The above copyright notice and this permission notice shall be included in all
 copies or substantial portions of the Software.
 
+ATTRIBUTION (ADDITIONAL REQUIRED TERM)
+
+The Software is distributed as "Strata" by Imagina Colombia. Any deployment,
+distribution, or hosted use of the Software — including modified versions — must
+display the attribution notice "Made with Strata · Imagina" linking to
+https://imaginacolombia.com in the application's user interface (for example, the
+admin sidebar footer). This notice must remain visible to end users and must not
+be removed, hidden, obscured, disabled, or materially altered. Removing or
+concealing the attribution terminates the rights granted under this license.
+
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE

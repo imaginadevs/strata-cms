@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 270 128" role="img" aria-labelledby="t">
+  <title id="t">Strata logo — stacked layers mark with wordmark</title>
+  <style>
+    .wm { fill: #0f172a; }
+    @media (prefers-color-scheme: dark) {
+      .wm { fill: #f1f5f9; }
+      .layer-deep { fill: #3b82f6; }
+    }
+  </style>
+  <g transform="translate(8,34.2) scale(0.466)">
+    <polygon class="layer-deep" fill="#1e40af" points="56,76 94,92 56,108 18,92" />
+    <polygon fill="#2563eb" points="64,48 102,64 64,80 26,64" />
+    <polygon fill="#60a5fa" points="72,20 110,36 72,52 34,36" />
+  </g>
+  <text class="wm" x="74" y="85"
+        font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif"
+        font-size="58" font-weight="700" letter-spacing="-1">Strata</text>
+</svg>
