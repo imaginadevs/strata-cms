@@ -172,6 +172,62 @@ func (r *userRepository) RecordLogin(ctx context.Context, tenantID, userID uuid.
 	return err
 }
 
+func (r *userRepository) SetInvite(ctx context.Context, tenantID, userID uuid.UUID, tokenHash string, expiresAt time.Time) error {
+	_, err := r.db.Exec(ctx, fmt.Sprintf(
+		`UPDATE %s.users SET invite_token_hash=$1, invite_expires_at=$2, updated_at=NOW() WHERE id=$3`,
+		schemaOf(tenantID)), tokenHash, expiresAt, userID)
+	return err
+}
+
+func (r *userRepository) GetByInviteToken(ctx context.Context, tenantID uuid.UUID, tokenHash string) (*userdomain.User, error) {
+	s := schemaOf(tenantID)
+	// Only return the user while the invite is still valid (unexpired).
+	u, err := scanUserRow(r.db.QueryRow(ctx,
+		fmt.Sprintf(`SELECT`+userCols+` FROM %s.users
+			WHERE invite_token_hash=$1 AND invite_expires_at > NOW() LIMIT 1`, s), tokenHash))
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return u, nil
+}
+
+func (r *userRepository) AcceptInvite(ctx context.Context, tenantID, userID uuid.UUID, passwordHash string) error {
+	_, err := r.db.Exec(ctx, fmt.Sprintf(`
+		UPDATE %s.users
+		SET password_hash=$1, status='active', invite_token_hash=NULL, invite_expires_at=NULL, updated_at=NOW()
+		WHERE id=$2`, schemaOf(tenantID)), passwordHash, userID)
+	return err
+}
+
+func (r *userRepository) ListAdminEmails(ctx context.Context, tenantID uuid.UUID) ([]string, error) {
+	s := schemaOf(tenantID)
+	rows, err := r.db.Query(ctx, fmt.Sprintf(`
+		SELECT DISTINCT u.email
+		FROM %s.users u
+		LEFT JOIN %s.user_roles ur ON ur.user_id = u.id
+		LEFT JOIN %s.roles r ON r.id = ur.role_id
+		WHERE u.status = 'active'
+		  AND (u.is_super_admin = TRUE OR r.name = 'Administrator')`, s, s, s))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var emails []string
+	for rows.Next() {
+		var e string
+		if err := rows.Scan(&e); err != nil {
+			return nil, err
+		}
+		if e != "" {
+			emails = append(emails, e)
+		}
+	}
+	return emails, rows.Err()
+}
+
 // ─── role loading ─────────────────────────────────────────────────────────────
 
 func (r *userRepository) loadRoles(ctx context.Context, tenantID uuid.UUID, u *userdomain.User) error {

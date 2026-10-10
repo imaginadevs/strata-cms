@@ -4,8 +4,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/google/uuid"
 
 	httpMiddleware "github.com/imaginacolombia/cms/internal/adapters/http/middleware"
 	postgresrepo "github.com/imaginacolombia/cms/internal/adapters/persistence/postgres"
@@ -26,6 +28,7 @@ func MountCollections(r chi.Router, repos *postgresrepo.Repos, bus events.Bus, l
 	r.Route("/collections", func(r chi.Router) {
 		r.With(httpMiddleware.RequirePermission(p, userdomain.VirtualSchema, userdomain.ActionRead)).Get("/", h.list)
 		r.With(httpMiddleware.RequirePermission(p, userdomain.VirtualSchema, userdomain.ActionCreate)).Post("/", h.create)
+		r.With(httpMiddleware.RequirePermission(p, userdomain.VirtualSchema, userdomain.ActionUpdate)).Patch("/reorder", h.reorderCollections)
 		r.With(httpMiddleware.RequirePermission(p, userdomain.VirtualSchema, userdomain.ActionRead)).Get("/{name}", h.getByName)
 		r.With(httpMiddleware.RequirePermission(p, userdomain.VirtualSchema, userdomain.ActionUpdate)).Patch("/{name}", h.update)
 		r.With(httpMiddleware.RequirePermission(p, userdomain.VirtualSchema, userdomain.ActionDelete)).Delete("/{name}", h.delete)
@@ -236,13 +239,15 @@ func (h *collectionHandler) update(w http.ResponseWriter, r *http.Request) {
 	// delete endpoints.
 
 	var body struct {
-		DisplayName *string `json:"display_name"`
-		Icon        *string `json:"icon"`
-		Color       *string `json:"color"`
-		Note        *string `json:"note"`
-		IsHidden    *bool   `json:"is_hidden"`
-		IsSingleton *bool   `json:"is_singleton"`
-		SortField   *string `json:"sort_field"`
+		DisplayName *string         `json:"display_name"`
+		Icon        *string         `json:"icon"`
+		Color       *string         `json:"color"`
+		Note        *string         `json:"note"`
+		IsHidden    *bool           `json:"is_hidden"`
+		IsSingleton *bool           `json:"is_singleton"`
+		SortField   *string         `json:"sort_field"`
+		GroupID     json.RawMessage `json:"group_id"` // absent = unchanged; null = ungroup; "uuid" = assign
+		Sort        *int            `json:"sort"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid body")
@@ -270,6 +275,22 @@ func (h *collectionHandler) update(w http.ResponseWriter, r *http.Request) {
 	if body.SortField != nil {
 		coll.SortField = body.SortField
 	}
+	if body.Sort != nil {
+		coll.Sort = *body.Sort
+	}
+	if body.GroupID != nil { // key present in the request
+		trimmed := strings.TrimSpace(string(body.GroupID))
+		if trimmed == "null" || trimmed == `""` {
+			coll.GroupID = nil // move to ungrouped
+		} else {
+			var gidStr string
+			if err := json.Unmarshal(body.GroupID, &gidStr); err == nil && gidStr != "" {
+				if gid, err := uuid.Parse(gidStr); err == nil {
+					coll.GroupID = &gid
+				}
+			}
+		}
+	}
 	coll.Touch(&actorID)
 
 	if err := h.repos.Collection.Update(r.Context(), tenantID, coll); err != nil {
@@ -282,6 +303,45 @@ func (h *collectionHandler) update(w http.ResponseWriter, r *http.Request) {
 		auditdomain.OperationUpdate, oldSnap, collectionSnapshot(coll))
 
 	writeJSON(w, http.StatusOK, coll)
+}
+
+// reorderCollections applies group membership + sort to many collections at once
+// (sidebar / content-overview drag-and-drop).
+func (h *collectionHandler) reorderCollections(w http.ResponseWriter, r *http.Request) {
+	tenantID, _ := httpMiddleware.TenantIDFromCtx(r.Context())
+
+	var body struct {
+		Items []struct {
+			ID      string  `json:"id"`
+			GroupID *string `json:"group_id"`
+			Sort    int     `json:"sort"`
+		} `json:"items"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid body")
+		return
+	}
+
+	placements := make([]collectiondomain.CollectionPlacement, 0, len(body.Items))
+	for _, it := range body.Items {
+		id, err := uuid.Parse(it.ID)
+		if err != nil {
+			continue
+		}
+		var gid *uuid.UUID
+		if it.GroupID != nil && *it.GroupID != "" {
+			if g, err := uuid.Parse(*it.GroupID); err == nil {
+				gid = &g
+			}
+		}
+		placements = append(placements, collectiondomain.CollectionPlacement{ID: id, GroupID: gid, Sort: it.Sort})
+	}
+	if err := h.repos.Collection.ReorderCollections(r.Context(), tenantID, placements); err != nil {
+		h.log.Errorw("reorder collections failed", "err", err)
+		writeError(w, http.StatusInternalServerError, "reorder failed")
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (h *collectionHandler) delete(w http.ResponseWriter, r *http.Request) {

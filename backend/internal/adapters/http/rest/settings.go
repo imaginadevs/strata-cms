@@ -12,11 +12,13 @@ import (
 	"github.com/imaginacolombia/cms/internal/core/domain/tenant"
 	userdomain "github.com/imaginacolombia/cms/internal/core/domain/user"
 	"github.com/imaginacolombia/cms/internal/core/features"
+	"github.com/imaginacolombia/cms/internal/infrastructure/config"
+	"github.com/imaginacolombia/cms/internal/infrastructure/crypto"
 	"github.com/imaginacolombia/cms/internal/infrastructure/logger"
 )
 
-func MountSettings(r chi.Router, repos *postgresrepo.Repos, log *logger.Logger) {
-	h := &settingsHandler{repos: repos, log: log}
+func MountSettings(r chi.Router, repos *postgresrepo.Repos, cfg *config.Config, enc *crypto.Encryptor, log *logger.Logger) {
+	h := &settingsHandler{repos: repos, cfg: cfg, enc: enc, log: log}
 	p := repos.Permission
 
 	r.With(httpMiddleware.RequirePermission(p, userdomain.VirtualSettings, userdomain.ActionRead)).Get("/settings", h.get)
@@ -25,10 +27,23 @@ func MountSettings(r chi.Router, repos *postgresrepo.Repos, log *logger.Logger) 
 
 type settingsHandler struct {
 	repos *postgresrepo.Repos
+	cfg   *config.Config
+	enc   *crypto.Encryptor
 	log   *logger.Logger
 }
 
-// GET /api/settings — returns current tenant settings
+// storageEnvInfo tells the UI whether a default (environment) S3 exists, so the
+// "inherit the default credentials" option can be offered.
+func (h *settingsHandler) storageEnvInfo() map[string]any {
+	return map[string]any{
+		"configured": h.cfg.Storage.Bucket != "",
+		"bucket":     h.cfg.Storage.Bucket,
+		"endpoint":   h.cfg.Storage.Endpoint,
+		"has_cdn":    h.cfg.Storage.CDNBaseURL != "",
+	}
+}
+
+// GET /api/settings — returns current tenant settings (S3 secret masked)
 func (h *settingsHandler) get(w http.ResponseWriter, r *http.Request) {
 	t, ok := httpMiddleware.TenantFromCtx(r.Context())
 	if !ok {
@@ -36,11 +51,16 @@ func (h *settingsHandler) get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	t.Settings.NormalizePlugins()
+	// Never return the S3 secret; expose only whether one is set.
+	secretSet := t.Settings.Storage.SecretKey != ""
+	t.Settings.Storage.SecretKey = ""
 	writeJSON(w, http.StatusOK, map[string]any{
 		"tenant":   t,
 		"settings": t.Settings,
 		// Only plugins this tenant is entitled to see (super-admin sets allowed).
-		"plugins": features.AllowedCatalog(t.Settings),
+		"plugins":            features.AllowedCatalog(t.Settings),
+		"storage_env":        h.storageEnvInfo(),
+		"storage_secret_set": secretSet,
 	})
 }
 
@@ -121,6 +141,13 @@ func (h *settingsHandler) update(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		incoming.NormalizePlugins()
+		// Preserve the stored (already-encrypted) S3 secret when the client didn't
+		// re-enter it (GET masks it to ""); otherwise encrypt the new secret at rest.
+		if incoming.Storage.SecretKey == "" {
+			incoming.Storage.SecretKey = prev.Storage.SecretKey
+		} else {
+			incoming.Storage.SecretKey = h.enc.Encrypt(incoming.Storage.SecretKey)
+		}
 		t.Settings = incoming
 	}
 
@@ -136,9 +163,13 @@ func (h *settingsHandler) update(w http.ResponseWriter, r *http.Request) {
 
 	// Collection provisioning is explicit via POST /api/plugins/{id}/install.
 
+	secretSet := t.Settings.Storage.SecretKey != ""
+	t.Settings.Storage.SecretKey = ""
 	writeJSON(w, http.StatusOK, map[string]any{
-		"tenant":   t,
-		"settings": t.Settings,
-		"plugins":  features.AllowedCatalog(t.Settings),
+		"tenant":             t,
+		"settings":           t.Settings,
+		"plugins":            features.AllowedCatalog(t.Settings),
+		"storage_env":        h.storageEnvInfo(),
+		"storage_secret_set": secretSet,
 	})
 }

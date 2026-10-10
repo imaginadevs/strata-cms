@@ -10,6 +10,12 @@ bin/
 backend/tmp/
 backend/*.env
 
+# Premium / closed-source plugins — kept in a SEPARATE PRIVATE repo and checked
+# out here (git submodule) only for premium builds (go build -tags premium).
+# The OSS repo never contains these, so a plain install needs no private auth.
+backend/internal/premium/
+backend/cmd/server/premium.go
+
 
 
 # Frontend

@@ -9,34 +9,37 @@ import (
 
 type superAdminKey struct{}
 
-// SuperAdminGate is middleware that:
-//  1. Marks the request as coming from a super-admin if the JWT claims it.
-//  2. Enforces that super-admin requests originate from the IP whitelist.
-//     The whitelist is loaded from config only (never from the database),
-//     so it cannot be escalated by any tenant or user action.
-//  3. Blocks the request with 403 if the IP is not in the whitelist.
+// SuperAdminGate gates the USE of super-admin privilege by source IP — it does
+// NOT restrict ordinary authenticated access.
+//
+//   - Request has no super-admin claim → passed through unchanged.
+//   - Super-admin claim from an allowed IP → elevated: the request is marked
+//     super-admin and super-admin-only handlers accept it.
+//   - Super-admin claim from any other IP → NOT elevated, but still allowed to
+//     proceed as a normal tenant user. Super-admin-only handlers (which check
+//     IsSuperAdmin) will refuse; everything else works as it would for any admin.
+//
+// This matters because a super-admin user still operates their own tenant like a
+// normal admin, so the IP allowlist must not 403 them out of regular endpoints.
+// The whitelist is loaded from config only (never from the database), so it cannot
+// be escalated by any tenant or user action.
 func SuperAdminGate(allowedIPs []string) func(http.Handler) http.Handler {
 	cidrs := parseCIDRs(allowedIPs)
 
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			// This middleware only acts when the JWT includes a super-admin claim.
-			// If no claim is set, pass through unchanged (regular auth applies).
 			if !isSuperAdminClaim(r.Context()) {
 				next.ServeHTTP(w, r)
 				return
 			}
-
-			// IP enforcement — super admins MUST come from an allowed IP.
-			clientIP := extractIP(r)
-			if !isAllowed(clientIP, cidrs) {
-				http.Error(w, `{"error":"forbidden"}`, http.StatusForbidden)
+			// Elevate to super-admin only from an allowed IP; otherwise proceed
+			// without elevation (no 403 here — that's for the handlers to decide).
+			if isAllowed(extractIP(r), cidrs) {
+				ctx := context.WithValue(r.Context(), superAdminKey{}, true)
+				next.ServeHTTP(w, r.WithContext(ctx))
 				return
 			}
-
-			// Mark context so handlers know this is a super-admin request.
-			ctx := context.WithValue(r.Context(), superAdminKey{}, true)
-			next.ServeHTTP(w, r.WithContext(ctx))
+			next.ServeHTTP(w, r)
 		})
 	}
 }
@@ -48,9 +51,14 @@ func IsSuperAdmin(ctx context.Context) bool {
 	return v
 }
 
-// isSuperAdminClaim reads the JWT roles to check for the super-admin marker.
-// The super-admin role name is intentionally not documented in public API docs.
+// isSuperAdminClaim reports whether the authenticated principal is a super admin.
+// The authoritative source is the token's `sa` claim (set from users.is_super_admin
+// and injected as CtxKeyIsSuperAdmin by Authenticate). A legacy "super_admin" role
+// name is also honored for backward compatibility.
 func isSuperAdminClaim(ctx context.Context) bool {
+	if IsSuperAdminFromCtx(ctx) {
+		return true
+	}
 	roles := RolesFromCtx(ctx)
 	for _, r := range roles {
 		if r == "super_admin" {
@@ -69,9 +77,14 @@ func parseCIDRs(list []string) []*net.IPNet {
 		if s == "" {
 			continue
 		}
-		// Support plain IPs as well as CIDR notation
+		// Support plain IPs as well as CIDR notation. A bare IPv6 address needs a
+		// /128 host mask (not /32, which would widen it to a huge range).
 		if !strings.Contains(s, "/") {
-			s += "/32"
+			if strings.Contains(s, ":") {
+				s += "/128"
+			} else {
+				s += "/32"
+			}
 		}
 		_, ipNet, err := net.ParseCIDR(s)
 		if err == nil {

@@ -963,6 +963,7 @@ function AddRelationPanel({
   const [relatedCollection, setRelatedCollection] = useState("");
   const [fieldName, setFieldName] = useState("");
   const [displayName, setDisplayName] = useState("");
+  const [displayField, setDisplayField] = useState("");
   const [required, setRequired] = useState(false);
   const [onDelete, setOnDelete] = useState<"set_null" | "cascade" | "restrict">("set_null");
   const [junctionTable, setJunctionTable] = useState("");
@@ -970,6 +971,9 @@ function AddRelationPanel({
 
   const needsField = relType !== "many_to_many";
   const needsJunction = relType === "many_to_many";
+  // The FK column points at (and shows a value from) the related collection only
+  // for these two types; o2m stores the FK on the child, m2m has no FK column.
+  const needsDisplayField = relType === "many_to_one" || relType === "one_to_one";
   const otherCollections = allCollections.filter((c) => c.name !== collectionName);
 
   // Global system tables that live outside the tenant schema but can be referenced.
@@ -977,6 +981,28 @@ function AddRelationPanel({
   const GLOBAL_TARGETS = [
     { name: "users", label: "Users (system)" },
   ];
+
+  // Load the related collection's fields so the user can pick which one is the
+  // human-readable "display" label (stored in field.options.display_field).
+  const { data: relatedColl } = useQuery({
+    queryKey: ["collection", relatedCollection],
+    queryFn: () => fetchCollection(relatedCollection),
+    enabled:
+      !!relatedCollection &&
+      needsDisplayField &&
+      !GLOBAL_TARGETS.some((t) => t.name === relatedCollection),
+  });
+  const relatedFields = relatedColl
+    ? allFields(relatedColl).filter((f) => !f.hidden && f.type !== "relation")
+    : [];
+  const guessedDisplayField = (() => {
+    const names = relatedFields.map((f) => f.name);
+    for (const pref of ["name", "title", "label", "slug"]) {
+      if (names.includes(pref)) return pref;
+    }
+    return relatedFields.find((f) => f.type === "string" || f.type === "text")?.name ?? "";
+  })();
+  const effectiveDisplayField = displayField || guessedDisplayField;
 
   // Auto-suggest names when inputs change
   function applySuggestions(type: RelationType, related: string) {
@@ -1000,6 +1026,7 @@ function AddRelationPanel({
 
   function handleRelatedChange(val: string) {
     setRelatedCollection(val);
+    setDisplayField(""); // re-guess from the new target's fields
     applySuggestions(relType, val);
   }
 
@@ -1016,6 +1043,7 @@ function AddRelationPanel({
         related_collection: relatedCollection,
         field_name: fieldName,
         display_name: displayName,
+        display_field: needsDisplayField ? effectiveDisplayField : "",
         required,
         on_delete: onDelete,
         junction_table: junctionTable,
@@ -1147,6 +1175,27 @@ function AddRelationPanel({
                       placeholder="Category"
                     />
                   </div>
+                  {needsDisplayField && relatedFields.length > 0 && (
+                    <div>
+                      <label className="mb-1.5 block text-xs font-medium text-slate-700 dark:text-slate-200">
+                        Display Field
+                      </label>
+                      <select
+                        className="w-full rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2 text-sm text-slate-800 dark:text-slate-100 focus:border-brand-400 dark:focus:border-brand-500/60 focus:outline-none focus:ring-2 focus:ring-brand-100 dark:focus:ring-brand-500/20"
+                        value={effectiveDisplayField}
+                        onChange={(e) => setDisplayField(e.target.value)}
+                      >
+                        {relatedFields.map((f) => (
+                          <option key={f.id} value={f.name}>
+                            {f.display_name} ({f.name})
+                          </option>
+                        ))}
+                      </select>
+                      <p className="mt-1 text-xs text-slate-400">
+                        Which field of “{relatedCollection}” to show as the label instead of the UUID
+                      </p>
+                    </div>
+                  )}
                 </>
               )}
 
@@ -2110,12 +2159,35 @@ function EditFieldPanel({
     (f) => !f.is_system && f.name !== field.name
   );
 
+  // Relation display field — which column of the related collection to show as the
+  // human-readable label instead of the raw UUID (stored in options.display_field).
+  const relRelatedCollection =
+    field.type === "relation"
+      ? ((field.options?.related_collection as string | undefined) ?? "")
+      : "";
+  const [displayField, setDisplayField] = useState(
+    (field.options?.display_field as string | undefined) ?? ""
+  );
+  const { data: relatedColl } = useQuery({
+    queryKey: ["collection", relRelatedCollection],
+    queryFn: () => get<Collection>(`/collections/${relRelatedCollection}`),
+    enabled: field.type === "relation" && !!relRelatedCollection,
+    staleTime: 60_000,
+  });
+  const relationFields = relatedColl
+    ? allFields(relatedColl).filter((f) => !f.hidden && f.type !== "relation")
+    : [];
+
   const mutation = useMutation({
     mutationFn: () => {
-      // Build options: keep all existing keys, merge auto_generate
-      const updatedOptions: Record<string, unknown> = {};
+      // Build options: keep all existing keys (e.g. related_collection), then
+      // merge in the ones this panel edits.
+      const updatedOptions: Record<string, unknown> = { ...(field.options ?? {}) };
       if (field.type === "select" || field.type === "multiselect") {
         updatedOptions.choices = choices;
+      }
+      if (field.type === "relation") {
+        updatedOptions.display_field = displayField || null;
       }
       if (autoGenFn) {
         updatedOptions.auto_generate = {
@@ -2228,6 +2300,36 @@ function EditFieldPanel({
                   </label>
                 ))}
               </div>
+
+              {/* Display field — relation only */}
+              {field.type === "relation" && (
+                <div>
+                  <label className="mb-1.5 block text-xs font-medium text-slate-700 dark:text-slate-200">
+                    Display Field
+                  </label>
+                  {relationFields.length > 0 ? (
+                    <select
+                      className="w-full rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2 text-sm text-slate-800 dark:text-slate-100 focus:border-brand-400 dark:focus:border-brand-500/60 focus:outline-none focus:ring-2 focus:ring-brand-100 dark:focus:ring-brand-500/20"
+                      value={displayField}
+                      onChange={(e) => setDisplayField(e.target.value)}
+                    >
+                      <option value="">— auto (first text field) —</option>
+                      {relationFields.map((f) => (
+                        <option key={f.id} value={f.name}>
+                          {f.display_name} ({f.name})
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <p className="text-xs text-slate-400">
+                      {relRelatedCollection ? "Loading related fields…" : "No related collection configured"}
+                    </p>
+                  )}
+                  <p className="mt-1 text-xs text-slate-400">
+                    Which field of “{relRelatedCollection || "the related collection"}” to show as the label instead of the UUID
+                  </p>
+                </div>
+              )}
 
               {/* Choices — select / multiselect only */}
               {isSelect && (

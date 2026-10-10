@@ -31,6 +31,20 @@ export interface TenantPlugins {
   enabled: Record<string, boolean>;
 }
 
+export interface TenantStorageSettings {
+  /** Use the environment/default S3 credentials; files go to tenants/{id}/… */
+  inherit: boolean;
+  endpoint: string;
+  region: string;
+  bucket: string;
+  access_key_id: string;
+  /** Write-only: send to set; omitted/blank preserves the stored secret. */
+  secret_key?: string;
+  public_base_url: string;
+  cdn_base_url: string;
+  force_path_style: boolean;
+}
+
 export interface TenantSettings {
   allow_registration: boolean;
   max_users?: number;
@@ -39,8 +53,17 @@ export interface TenantSettings {
   /** Legacy flat flags; mirrored from plugins.installed. Prefer plugins. */
   features: TenantFeatures;
   plugins?: TenantPlugins;
+  storage?: TenantStorageSettings;
   /** ISO 639-1 codes of languages enabled for this tenant. Empty defaults to ["en"]. */
   languages?: string[];
+}
+
+/** GET /settings response shape (adds env-storage info + secret presence). */
+export interface SettingsResponse {
+  tenant: Tenant;
+  settings: TenantSettings;
+  storage_env?: { configured: boolean; bucket: string; endpoint: string; has_cdn: boolean };
+  storage_secret_set?: boolean;
 }
 
 /** Catalog entry from GET /plugins (allowed for this tenant). */
@@ -108,9 +131,54 @@ export interface Collection extends BaseEntity {
   is_singleton: boolean;
   sort_field: string | null;
   meta: Record<string, unknown>;
+  /** Sidebar folder this collection belongs to; null = ungrouped. */
+  group_id: string | null;
+  /** Position within its group (or among ungrouped collections) in the nav. */
+  sort: number;
   /** Nested form layout; fields live under each section (not on the collection). */
   sections?: Section[];
   translations?: Translation[];
+}
+
+// ── API tokens ────────────────────────────────────────────────────────────────
+export interface ApiTokenPolicy {
+  /** Collection name, a virtual resource (e.g. cms_users), or "*" for all. */
+  collection: string;
+  /** read | create | update | delete | all */
+  action: string;
+  fields?: string[];
+  filter?: unknown;
+}
+
+export interface ApiToken {
+  id: string;
+  name: string;
+  secret_prefix: string;
+  policies: ApiTokenPolicy[];
+  lifetime: "forever" | "monthly";
+  rotate_at?: string | null;
+  last_notified_at?: string | null;
+  revoked: boolean;
+  last_used_at?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Create/rotate responses include the plaintext secret exactly once. */
+export interface ApiTokenSecret {
+  token: ApiToken;
+  secret: string;
+}
+
+// ── Collection group (sidebar folder) ───────────────────────────────────────────
+export interface CollectionGroup {
+  id: string;
+  name: string;
+  icon: string | null;
+  color: string | null;
+  sort: number;
+  created_at: string;
+  updated_at: string;
 }
 
 // ── Section ───────────────────────────────────────────────────────────────────

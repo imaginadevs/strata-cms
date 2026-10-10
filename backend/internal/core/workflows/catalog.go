@@ -17,9 +17,9 @@ type CatalogField struct {
 
 // CatalogEntry is one registered trigger or action type.
 type CatalogEntry struct {
-	Type        string         `json:"type"`
-	Name        string         `json:"name"`
-	Description string         `json:"description"`
+	Type         string         `json:"type"`
+	Name         string         `json:"name"`
+	Description  string         `json:"description"`
 	ConfigFields []CatalogField `json:"config_fields"`
 }
 
@@ -54,6 +54,15 @@ func triggerCatalogEntry(t wfdomain.TriggerType) CatalogEntry {
 				{Key: "op", Label: "Operator", Type: "string", Required: false, Description: "Reserved; use eq"},
 			},
 		}
+	case wfdomain.TriggerEntityCreated:
+		return CatalogEntry{
+			Type:        string(t),
+			Name:        "Entity created",
+			Description: "Fires when a new item is created in the collection.",
+			ConfigFields: []CatalogField{
+				{Key: "collection", Label: "Collection", Type: "string", Required: true},
+			},
+		}
 	case wfdomain.TriggerSchedule:
 		return CatalogEntry{
 			Type:        string(t),
@@ -85,6 +94,17 @@ func actionCatalogEntry(t wfdomain.ActionType) CatalogEntry {
 				{Key: "body", Label: "Body", Type: "string", Required: false},
 				{Key: "cc", Label: "Cc", Type: "any", Required: false},
 				{Key: "pdf", Label: "PDF options", Type: "object", Required: true, Description: "Object with template (required) and filename (optional)"},
+			},
+		}
+	case wfdomain.ActionSendTemplateEmail:
+		return CatalogEntry{
+			Type:        string(t),
+			Name:        "Send template email",
+			Description: "Sends a branded email from a registered template, rendered with the tenant's branding and the item data.",
+			ConfigFields: []CatalogField{
+				{Key: "template_key", Label: "Template", Type: "string", Required: true, Description: "Registered template id, e.g. blog.entry.created"},
+				{Key: "to", Label: "To", Type: "string", Required: true, Description: "Recipient(s); comma-separated, {{item.email}}, or 'admins' for all tenant admins"},
+				{Key: "cc", Label: "Cc", Type: "any", Required: false},
 			},
 		}
 	default:

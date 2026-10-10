@@ -101,6 +101,20 @@ func checkPermission(r *http.Request, perms outbound.PermissionRepository, colle
 	userID, hasUser := UserIDFromCtx(ctx)
 	principal := PrincipalFromCtx(ctx)
 
+	// API tokens are evaluated against their own policy list (carried in context),
+	// not the DB role graph. No Administrator/super bypass applies — a token can do
+	// only what its policies grant.
+	if principal == PrincipalAPIToken {
+		for _, pol := range TokenPoliciesFromCtx(ctx) {
+			if (pol.Collection == collection || pol.Collection == "*") &&
+				(pol.Action == action || pol.Action == "all" || pol.Action == "*") {
+				*r = *r.WithContext(WithPermFilter(ctx, pol.Filter))
+				return true
+			}
+		}
+		return false
+	}
+
 	var p *userdomain.Permission
 	var err error
 	switch {

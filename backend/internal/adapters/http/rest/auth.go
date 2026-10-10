@@ -31,6 +31,7 @@ func MountAuth(r chi.Router, cfg *config.Config, repos *postgresrepo.Repos, bus 
 	r.Post("/auth/login", h.login)
 	r.Post("/auth/logout", h.logout)
 	r.Post("/auth/refresh", h.refresh)
+	r.Post("/auth/accept-invite", h.acceptInvite)
 	// /auth/me needs the JWT parsed (from the access_token cookie or header) to
 	// identify the caller — the public group has no Authenticate middleware, so
 	// attach it just for this route. This is what restores the session on reload.
@@ -163,6 +164,103 @@ func (h *authHandler) login(w http.ResponseWriter, r *http.Request) {
 		UserID:    &u.ID,
 		UserEmail: u.Email,
 	})
+
+	writeJSON(w, http.StatusOK, tokenResponse{
+		AccessToken:  accessToken,
+		RefreshToken: refreshToken,
+		ExpiresAt:    accessExpiry,
+		User: userInfo{
+			ID:           u.ID.String(),
+			Email:        u.Email,
+			FirstName:    u.FirstName,
+			LastName:     u.LastName,
+			Avatar:       u.Avatar,
+			Roles:        roles,
+			IsSuperAdmin: u.IsSuperAdmin,
+		},
+	})
+}
+
+// ─── accept invite ─────────────────────────────────────────────────────────────
+
+// acceptInvite activates an invited user: it validates the invite token, sets the
+// chosen password, marks the account active, and logs the user in (same token
+// response as login). Public route; tenant resolved from the Host domain.
+func (h *authHandler) acceptInvite(w http.ResponseWriter, r *http.Request) {
+	tenantID, ok := httpMiddleware.TenantIDFromCtx(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "tenant not resolved")
+		return
+	}
+	var req struct {
+		Token    string `json:"token"`
+		Password string `json:"password"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	if req.Token == "" || len(req.Password) < 8 {
+		writeError(w, http.StatusBadRequest, "token and a password of at least 8 characters are required")
+		return
+	}
+
+	u, err := h.repos.User.GetByInviteToken(r.Context(), tenantID, hashToken(req.Token))
+	if err != nil {
+		h.log.Errorw("accept invite: lookup failed", "err", err)
+		writeError(w, http.StatusInternalServerError, "could not accept invite")
+		return
+	}
+	if u == nil {
+		writeError(w, http.StatusBadRequest, "this invitation is invalid or has expired")
+		return
+	}
+
+	hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "could not set password")
+		return
+	}
+	if err := h.repos.User.AcceptInvite(r.Context(), tenantID, u.ID, string(hash)); err != nil {
+		h.log.Errorw("accept invite: activation failed", "err", err)
+		writeError(w, http.StatusInternalServerError, "could not accept invite")
+		return
+	}
+
+	// Reload with roles so the issued token + response are complete.
+	if full, err := h.repos.User.GetByID(r.Context(), tenantID, u.ID); err == nil && full != nil {
+		u = full
+	}
+	roles := make([]string, 0, len(u.Roles))
+	for _, role := range u.Roles {
+		roles = append(roles, role.Name)
+	}
+
+	accessExpiry := time.Now().Add(h.cfg.Auth.JWTExpiry)
+	accessToken, err := h.issueToken(tenantID, u.ID, u.Email, roles, u.IsSuperAdmin, httpMiddleware.PrincipalUser, "", accessExpiry)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "could not issue token")
+		return
+	}
+	refreshToken, refreshExpiry, err := h.newRefreshToken()
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "could not create session")
+		return
+	}
+	ipAddr, ua := requestOrigin(r)
+	sess := &outbound.Session{
+		ID:           ids.New(),
+		UserID:       &u.ID,
+		RefreshToken: refreshToken,
+		ExpiresAt:    refreshExpiry,
+		IPAddress:    &ipAddr,
+		UserAgent:    &ua,
+	}
+	if err := h.repos.Session.Create(r.Context(), tenantID, sess); err != nil {
+		writeError(w, http.StatusInternalServerError, "could not create session")
+		return
+	}
+	_ = h.repos.User.RecordLogin(r.Context(), tenantID, u.ID)
 
 	writeJSON(w, http.StatusOK, tokenResponse{
 		AccessToken:  accessToken,

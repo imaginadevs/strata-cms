@@ -13,11 +13,13 @@ import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 
 // Lazy-loaded pages for maximum code-splitting performance
 const LoginPage             = lazy(() => import("@/pages/Login"));
+const AcceptInvitePage      = lazy(() => import("@/pages/AcceptInvite"));
 const DashboardPage         = lazy(() => import("@/pages/Dashboard"));
 const CollectionsPage       = lazy(() => import("@/pages/Collections"));
 const CollectionDetailPage  = lazy(() =>
   import("@/pages/Collections").then((m) => ({ default: m.CollectionDetailPage }))
 );
+const ContentOverviewPage = lazy(() => import("@/pages/ContentOverview"));
 const ContentPage       = lazy(() => import("@/pages/Content"));
 const ContentCreatePage = lazy(() =>
   import("@/pages/Content").then((m) => ({ default: m.ContentCreatePage }))
@@ -26,7 +28,9 @@ const ContentEditPage = lazy(() =>
   import("@/pages/Content").then((m) => ({ default: m.ContentEditPage }))
 );
 const UsersPage       = lazy(() => import("@/pages/Users"));
+const TenantsPage     = lazy(() => import("@/pages/Tenants"));
 const RolesPage       = lazy(() => import("@/pages/Roles"));
+const ApiTokensPage   = lazy(() => import("@/pages/ApiTokens"));
 const ProfilePage     = lazy(() => import("@/pages/Profile"));
 const SettingsPage    = lazy(() => import("@/pages/Settings"));
 const AuditPage       = lazy(() => import("@/pages/Audit"));
@@ -63,6 +67,13 @@ const loginRoute = createRoute({
   component: () => <LoginPage />,
 });
 
+// Public — invited users set their password here (no auth required).
+const acceptInviteRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/accept-invite",
+  component: () => <AcceptInvitePage />,
+});
+
 // ── Protected layout route ────────────────────────────────────────────────────
 const protectedRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -94,6 +105,13 @@ const collectionDetailRoute = createRoute({
   getParentRoute: () => protectedRoute,
   path: "/collections/$name",
   component: () => <CollectionDetailPage />,
+});
+
+// Content overview — all collections as grouped cards, e.g. /content
+const contentOverviewRoute = createRoute({
+  getParentRoute: () => protectedRoute,
+  path: "/content",
+  component: () => <ContentOverviewPage />,
 });
 
 // Content browser — list view per collection, e.g. /content/blog_posts
@@ -147,10 +165,22 @@ const usersRoute = createRoute({
   component: () => <UsersPage />,
 });
 
+const tenantsRoute = createRoute({
+  getParentRoute: () => protectedRoute,
+  path: "/tenants",
+  component: () => <TenantsPage />,
+});
+
 const rolesRoute = createRoute({
   getParentRoute: () => protectedRoute,
   path: "/roles",
   component: () => <RolesPage />,
+});
+
+const apiTokensRoute = createRoute({
+  getParentRoute: () => protectedRoute,
+  path: "/api-tokens",
+  component: () => <ApiTokensPage />,
 });
 
 const profileRoute = createRoute({
@@ -180,10 +210,12 @@ const notFoundRoute = createRoute({
 // ── Route tree ────────────────────────────────────────────────────────────────
 const routeTree = rootRoute.addChildren([
   loginRoute,
+  acceptInviteRoute,
   protectedRoute.addChildren([
     indexRoute,
     collectionsRoute,
     collectionDetailRoute,
+    contentOverviewRoute, // /content (index) — before $collection
     contentCreateRoute,   // must come before contentRoute so /create isn't swallowed by $collection
     contentEditRoute,
     contentRoute,
@@ -192,7 +224,9 @@ const routeTree = rootRoute.addChildren([
     workflowDetailRoute,
     workflowsRoute,
     usersRoute,
+    tenantsRoute,
     rolesRoute,
+    apiTokensRoute,
     profileRoute,
     settingsRoute,
     auditRoute,

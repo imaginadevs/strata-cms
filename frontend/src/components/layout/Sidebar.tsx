@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Link, useRouterState } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
@@ -9,20 +9,28 @@ import {
   ScrollText,
   Settings,
   ChevronLeft,
-  Globe,
+  ChevronDown,
+  ChevronRight,
   Lock,
   Plus,
+  Search,
+  Folder,
+  LayoutGrid,
   SlidersHorizontal,
   Shield,
   Workflow,
+  Building2,
+  KeyRound,
 } from "lucide-react";
+import { StrataMark } from "@/components/ui/StrataMark";
 import { useTenantStore } from "@/store/tenant.store";
+import { useAuthStore } from "@/store/auth.store";
 import { useUIStore } from "@/store/ui.store";
 import { get } from "@/lib/api";
-import type { Collection, PaginatedResponse } from "@/types";
+import type { Collection, CollectionGroup, PaginatedResponse } from "@/types";
 
 // ── Routes that belong to the "settings" section ─────────────────────────────
-const SETTINGS_ROOTS = ["/collections", "/users", "/roles", "/audit", "/settings"];
+const SETTINGS_ROOTS = ["/collections", "/users", "/tenants", "/roles", "/api-tokens", "/audit", "/settings"];
 
 function isInSettings(pathname: string) {
   return SETTINGS_ROOTS.some(
@@ -80,18 +88,136 @@ function NavItem({
   );
 }
 
+// ── Collapsed-group persistence (per browser) ─────────────────────────────────
+const COLLAPSE_KEY = "cms.nav.collapsed-groups";
+
+function useCollapsedGroups() {
+  const [collapsed, setCollapsed] = useState<Set<string>>(() => {
+    try {
+      const raw = localStorage.getItem(COLLAPSE_KEY);
+      return new Set<string>(raw ? JSON.parse(raw) : []);
+    } catch {
+      return new Set<string>();
+    }
+  });
+  const toggle = (id: string) =>
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      try {
+        localStorage.setItem(COLLAPSE_KEY, JSON.stringify([...next]));
+      } catch {
+        /* ignore private-mode write errors */
+      }
+      return next;
+    });
+  return { collapsed, toggle };
+}
+
+function CollectionLink({ c }: { c: Collection }) {
+  return (
+    <NavItem
+      to={`/content/${c.name}`}
+      label={c.display_name}
+      icon={c.is_system ? Lock : Database}
+      iconColor={c.color ?? undefined}
+    />
+  );
+}
+
+// ── Collapsible group section ─────────────────────────────────────────────────
+function GroupSection({
+  group,
+  items,
+  open,
+  onToggle,
+}: {
+  group: CollectionGroup;
+  items: Collection[];
+  open: boolean;
+  onToggle: () => void;
+}) {
+  const color = group.color ?? undefined;
+  return (
+    <div className="pt-2">
+      <button
+        type="button"
+        onClick={onToggle}
+        className="flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-left transition-colors hover:bg-slate-100/70 dark:hover:bg-white/5"
+      >
+        {open ? (
+          <ChevronDown size={13} className="shrink-0 text-slate-400" />
+        ) : (
+          <ChevronRight size={13} className="shrink-0 text-slate-400" />
+        )}
+        <span
+          className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md"
+          style={
+            color
+              ? { backgroundColor: `${color}22`, color }
+              : undefined
+          }
+        >
+          <Folder size={12} className={color ? undefined : "text-slate-400"} />
+        </span>
+        <span className="flex-1 truncate text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+          {group.name}
+        </span>
+        <span className="text-[10px] font-medium text-slate-400">{items.length}</span>
+      </button>
+      <AnimatePresence initial={false}>
+        {open && (
+          <motion.ul
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.15 }}
+            className="space-y-0.5 overflow-hidden pl-3"
+          >
+            {items.map((c) => (
+              <CollectionLink key={c.id} c={c} />
+            ))}
+          </motion.ul>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
 // ── Content-mode nav ──────────────────────────────────────────────────────────
 function ContentNav() {
   const { data: collections = [], isLoading } = useQuery({
     queryKey: ["collections"],
     queryFn: () =>
-      get<PaginatedResponse<Collection>>("/collections").then(
-        (r) => r.data ?? []
-      ),
+      get<PaginatedResponse<Collection>>("/collections").then((r) => r.data ?? []),
+  });
+  const { data: groups = [] } = useQuery({
+    queryKey: ["collection-groups"],
+    queryFn: () => get<CollectionGroup[]>("/collection-groups"),
   });
 
+  const { collapsed, toggle } = useCollapsedGroups();
+  const [query, setQuery] = useState("");
+  const q = query.trim().toLowerCase();
+
   // Hidden collections (is_hidden) are kept out of the content menu.
-  const visibleCollections = collections.filter((c) => !c.is_hidden);
+  const visible = collections.filter((c) => !c.is_hidden);
+  const matches = (c: Collection) =>
+    !q ||
+    c.display_name.toLowerCase().includes(q) ||
+    c.name.toLowerCase().includes(q);
+
+  const byPosition = (a: Collection, b: Collection) =>
+    a.sort - b.sort || a.display_name.localeCompare(b.display_name);
+
+  const sortedGroups = [...groups].sort(
+    (a, b) => a.sort - b.sort || a.name.localeCompare(b.name)
+  );
+  const inGroup = (gid: string) =>
+    visible.filter((c) => c.group_id === gid && matches(c)).sort(byPosition);
+  const ungrouped = visible
+    .filter((c) => !c.group_id && matches(c))
+    .sort(byPosition);
 
   return (
     <nav className="flex-1 overflow-y-auto px-3 py-3 space-y-1">
@@ -105,42 +231,81 @@ function ContentNav() {
         </ul>
       </div>
 
-      {/* Dynamic collections */}
-      {visibleCollections.length > 0 && (
-        <div className="pt-3">
-          <p className="mb-1 px-3 text-[10px] font-semibold uppercase tracking-widest text-slate-400">
+      {/* Content header + quick search + overview link */}
+      <div className="pt-3">
+        <div className="mb-1 flex items-center justify-between px-3">
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400">
             Content
           </p>
+          <Link
+            to="/content"
+            className="flex items-center gap-1 text-[10px] font-medium text-slate-400 transition hover:text-brand-600 dark:hover:text-brand-300"
+            title="Browse all collections"
+          >
+            <LayoutGrid size={11} />
+            All
+          </Link>
+        </div>
+        {visible.length > 6 && (
+          <div className="mb-1 flex items-center gap-2 rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-2.5 py-1.5">
+            <Search size={13} className="shrink-0 text-slate-400" />
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Find a collection…"
+              className="w-full bg-transparent text-xs text-slate-700 placeholder:text-slate-400 focus:outline-none dark:text-slate-200"
+            />
+          </div>
+        )}
+      </div>
+
+      {/* Loading skeleton */}
+      {isLoading && (
+        <div className="space-y-1.5 px-3 pt-1">
+          {[72, 56, 64].map((w) => (
+            <div
+              key={w}
+              className="h-8 animate-pulse rounded-lg bg-slate-100 dark:bg-white/10"
+              style={{ width: `${w}%` }}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Grouped collections */}
+      {sortedGroups.map((g) => {
+        const items = inGroup(g.id);
+        if (q && items.length === 0) return null; // hide empty groups while searching
+        return (
+          <GroupSection
+            key={g.id}
+            group={g}
+            items={items}
+            open={!!q || !collapsed.has(g.id)}
+            onToggle={() => toggle(g.id)}
+          />
+        );
+      })}
+
+      {/* Ungrouped collections */}
+      {ungrouped.length > 0 && (
+        <div className="pt-2">
+          {sortedGroups.length > 0 && (
+            <p className="mb-1 px-3 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+              Ungrouped
+            </p>
+          )}
           <ul className="space-y-0.5">
-            {visibleCollections.map((c) => (
-              <NavItem
-                key={c.id}
-                to={`/content/${c.name}`}
-                label={c.display_name}
-                icon={c.is_system ? Lock : Database}
-                iconColor={c.color ?? undefined}
-              />
+            {ungrouped.map((c) => (
+              <CollectionLink key={c.id} c={c} />
             ))}
           </ul>
         </div>
       )}
 
-      {/* Placeholder while loading */}
-      {isLoading && (
-        <div className="pt-3">
-          <p className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-widest text-slate-400">
-            Content
-          </p>
-          <div className="space-y-1.5 px-3">
-            {[72, 56, 64].map((w) => (
-              <div
-                key={w}
-                className="h-8 animate-pulse rounded-lg bg-slate-100 dark:bg-white/10"
-                style={{ width: `${w}%` }}
-              />
-            ))}
-          </div>
-        </div>
+      {/* Empty search result */}
+      {q && ungrouped.length === 0 && sortedGroups.every((g) => inGroup(g.id).length === 0) && (
+        <p className="px-3 pt-2 text-xs text-slate-400">No collections match “{query}”.</p>
       )}
 
       {/* Automations */}
@@ -161,11 +326,24 @@ const SETTINGS_NAV = [
   { to: "/collections",  label: "Collections",   icon: Database },
   { to: "/users",        label: "Users",          icon: Users },
   { to: "/roles",        label: "Roles",          icon: Shield },
+  { to: "/api-tokens",   label: "API Tokens",     icon: KeyRound },
   { to: "/audit",        label: "Audit Logs",     icon: ScrollText },
   { to: "/settings",     label: "Configuration",  icon: SlidersHorizontal },
 ] as const;
 
 function SettingsNav() {
+  const user = useAuthStore((s) => s.user);
+  const isSuper = !!user?.is_super_admin || !!user?.roles?.includes("super_admin");
+
+  // Tenants management is super-admin only; insert it after Users.
+  const items = isSuper
+    ? [
+        ...SETTINGS_NAV.slice(0, 2),
+        { to: "/tenants", label: "Tenants", icon: Building2 } as const,
+        ...SETTINGS_NAV.slice(2),
+      ]
+    : SETTINGS_NAV;
+
   return (
     <nav className="flex-1 overflow-y-auto px-3 py-3">
       {/* Back to content */}
@@ -182,7 +360,7 @@ function SettingsNav() {
         Settings
       </p>
       <ul className="space-y-0.5">
-        {SETTINGS_NAV.map(({ to, label, icon }) => (
+        {items.map(({ to, label, icon }) => (
           <NavItem key={to} to={to} label={label} icon={icon} />
         ))}
       </ul>
@@ -221,11 +399,14 @@ export function Sidebar() {
           className="flex h-7 w-7 shrink-0 items-center justify-center
                      rounded-lg bg-brand-600 text-[11px] font-bold text-white shadow-sm"
         >
-          {tenant?.name?.[0]?.toUpperCase() ?? "C"}
+          {tenant?.name?.[0]?.toUpperCase() ?? "S"}
         </div>
-        <span className="text-sm font-bold text-slate-800 dark:text-slate-100 tracking-tight">
-          {tenant?.name ?? "My Workspace"}
-        </span>
+        <div className="flex min-w-0 flex-col leading-tight">
+          <span className="truncate text-sm font-bold text-slate-800 dark:text-slate-100 tracking-tight">
+            {tenant?.name ?? "Workspace"}
+          </span>
+          <span className="text-[11px] font-medium text-slate-400">Admin</span>
+        </div>
       </div>
 
       {/* Nav — animated between content and settings modes */}
@@ -257,8 +438,8 @@ export function Sidebar() {
         </AnimatePresence>
       </div>
 
-      {/* Footer — Settings entry (only in content mode) / version */}
-      <div className="shrink-0 border-t border-slate-100 dark:border-white/10 px-3 py-3">
+      {/* Footer — Settings entry (only in content mode) + required attribution */}
+      <div className="shrink-0 space-y-1 border-t border-slate-100 dark:border-white/10 px-3 py-3">
         {!settingsMode ? (
           <Link
             to="/collections"
@@ -276,11 +457,28 @@ export function Sidebar() {
           </Link>
         ) : (
           <div className="flex items-center gap-2 px-3 text-xs text-slate-400">
-            <Globe size={12} />
-            <span className="font-medium">CMS</span>
+            <StrataMark className="h-3.5 w-3.5" />
+            <span className="font-medium">Strata</span>
             <span className="ml-auto font-mono opacity-50">v0.1.0</span>
           </div>
         )}
+
+        {/*
+          Attribution — required by LICENSE (Attribution clause). This notice and
+          its link must remain visible in every deployment; do not remove or hide it.
+        */}
+        <a
+          href="https://www.imaginacolombia.com/"
+          target="_blank"
+          rel="noreferrer"
+          className="flex items-center justify-center gap-1.5 rounded-lg px-3 py-1.5
+                     text-[11px] text-slate-400 transition hover:text-brand-600 dark:hover:text-brand-300"
+        >
+          <StrataMark className="h-3 w-3" />
+          <span>
+            Made with <span className="font-semibold">Strata</span> · Imagina
+          </span>
+        </a>
       </div>
     </aside>
   );

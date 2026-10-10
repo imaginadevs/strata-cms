@@ -18,6 +18,15 @@ type Config struct {
 	SMTP       SMTPConfig
 	SuperAdmin SuperAdminConfig
 	Features   FeatureFlags
+	Security   SecurityConfig
+}
+
+// SecurityConfig holds secrets-at-rest configuration.
+type SecurityConfig struct {
+	// EncryptionKey encrypts secrets stored in the DB (e.g. tenant S3 secret).
+	// Falls back to JWT_SECRET when unset. Changing it makes existing ciphertext
+	// unreadable — rotate deliberately.
+	EncryptionKey string
 }
 
 type AppConfig struct {
@@ -46,6 +55,16 @@ type StorageConfig struct {
 	SecretKey      string
 	PublicBaseURL  string
 	ForcePathStyle bool // required for MinIO
+	// CDNBaseURL is the origin of the image/transform CDN used to serve files
+	// marked public (e.g. https://images.imaginahosting.com). Public files are
+	// served through the CDN; private files use short-lived presigned URLs.
+	CDNBaseURL string
+	// MaxUploadBytes caps a single upload. 0 means no explicit limit.
+	MaxUploadBytes int64
+	// KeyPrefix namespaces this app's objects inside a bucket shared with other
+	// apps (e.g. "cms"). Keys become {prefix}/tenants/{id}/{collection}/{uuid}.ext.
+	// Empty = no prefix.
+	KeyPrefix string
 }
 
 type DatabaseConfig struct {
@@ -145,6 +164,12 @@ func Load() *Config {
 	cfg.Auth.JWTExpiry = v.GetDuration("JWT_EXPIRY")
 	cfg.Auth.RefreshTokenExpiry = v.GetDuration("REFRESH_TOKEN_EXPIRY")
 
+	// Secrets-at-rest key; falls back to the JWT secret when not set explicitly.
+	cfg.Security.EncryptionKey = v.GetString("SECRETS_ENCRYPTION_KEY")
+	if cfg.Security.EncryptionKey == "" {
+		cfg.Security.EncryptionKey = cfg.Auth.JWTSecret
+	}
+
 	cfg.Logto.Endpoint = v.GetString("LOGTO_ENDPOINT")
 	cfg.Logto.AppID = v.GetString("LOGTO_APP_ID")
 	cfg.Logto.AppSecret = v.GetString("LOGTO_APP_SECRET")
@@ -157,6 +182,9 @@ func Load() *Config {
 	cfg.Storage.SecretKey = v.GetString("S3_SECRET_KEY")
 	cfg.Storage.PublicBaseURL = v.GetString("S3_PUBLIC_BASE_URL")
 	cfg.Storage.ForcePathStyle = v.GetBool("S3_FORCE_PATH_STYLE")
+	cfg.Storage.CDNBaseURL = v.GetString("S3_CDN_BASE_URL")
+	cfg.Storage.MaxUploadBytes = int64(v.GetInt("S3_MAX_UPLOAD_MB")) * 1024 * 1024
+	cfg.Storage.KeyPrefix = v.GetString("S3_KEY_PREFIX")
 
 	cfg.Features.GraphQL = v.GetBool("ENABLE_GRAPHQL")
 	cfg.Features.REST = v.GetBool("ENABLE_REST")
@@ -170,15 +198,32 @@ func Load() *Config {
 	cfg.SMTP.Password = v.GetString("SMTP_PASSWORD")
 	cfg.SMTP.From = v.GetString("SMTP_FROM")
 
-	cfg.Kafka.Brokers = v.GetStringSlice("KAFKA_BROKERS")
+	cfg.Kafka.Brokers = splitList(v.GetString("KAFKA_BROKERS"))
 	cfg.Kafka.TopicPrefix = v.GetString("KAFKA_TOPIC_PREFIX")
 
-	// Super admin settings — sourced from env only, never from DB
-	cfg.SuperAdmin.AllowedIPs = v.GetStringSlice("SUPER_ADMIN_ALLOWED_IPS")
+	// Super admin settings — sourced from env only, never from DB.
+	// Parsed with splitList because viper's GetStringSlice splits a .env string on
+	// whitespace, not commas — so "a,b,c" would collapse into one bogus entry.
+	cfg.SuperAdmin.AllowedIPs = splitList(v.GetString("SUPER_ADMIN_ALLOWED_IPS"))
 	cfg.SuperAdmin.Email = v.GetString("SUPER_ADMIN_EMAIL")
 	cfg.SuperAdmin.Password = v.GetString("SUPER_ADMIN_PASSWORD")
 
 	return cfg
+}
+
+// splitList parses a comma- or whitespace-separated env value into a trimmed,
+// non-empty slice (e.g. "1.2.3.4, 5.6.7.8" → ["1.2.3.4","5.6.7.8"]).
+func splitList(s string) []string {
+	parts := strings.FieldsFunc(s, func(r rune) bool {
+		return r == ',' || r == ' ' || r == '\t' || r == '\n' || r == '\r'
+	})
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		if p = strings.TrimSpace(p); p != "" {
+			out = append(out, p)
+		}
+	}
+	return out
 }
 
 func setDefaults(v *viper.Viper) {
@@ -206,6 +251,7 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("KAFKA_TOPIC_PREFIX", "cms")
 	v.SetDefault("S3_REGION", "us-east-1")
 	v.SetDefault("S3_FORCE_PATH_STYLE", false)
+	v.SetDefault("S3_MAX_UPLOAD_MB", 25)
 }
 
 func buildDSN(db DatabaseConfig) string {

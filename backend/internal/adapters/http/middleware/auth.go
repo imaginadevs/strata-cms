@@ -7,6 +7,8 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
+
+	"github.com/imaginacolombia/cms/internal/core/domain/apitoken"
 )
 
 type contextKey string
@@ -26,12 +28,16 @@ const (
 	// CtxKeyPermFilter carries the row-level filter resolved by RequirePermission
 	// (from the matched Permission.Filter) so item handlers can apply it.
 	CtxKeyPermFilter contextKey = "perm_filter"
+	// CtxKeyTokenPolicies carries an API token's policy list when the principal is
+	// an api_token, so checkPermission can evaluate it without a DB round-trip.
+	CtxKeyTokenPolicies contextKey = "token_policies"
 )
 
 // Principal kinds carried in Claims.Principal / CtxKeyPrincipal.
 const (
-	PrincipalUser = "user" // a system cms_users account
-	PrincipalAuth = "auth" // a row in a custom auth-type collection
+	PrincipalUser     = "user"      // a system cms_users account
+	PrincipalAuth     = "auth"      // a row in a custom auth-type collection
+	PrincipalAPIToken = "api_token" // a programmatic API token (policy-scoped)
 )
 
 // Claims represents the JWT payload.
@@ -57,6 +63,12 @@ type Claims struct {
 func Authenticate(jwtSecret string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// An API token (resolved earlier by APITokenAuth) satisfies auth on its
+			// own — don't also require a JWT.
+			if PrincipalFromCtx(r.Context()) == PrincipalAPIToken {
+				next.ServeHTTP(w, r)
+				return
+			}
 			claims, err := extractClaims(r, jwtSecret)
 			if err != nil {
 				http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
@@ -180,10 +192,17 @@ func IsSuperAdminFromCtx(ctx context.Context) bool {
 	return v
 }
 
-// PrincipalFromCtx returns the principal kind ("user"/"auth"), defaulting to
-// "" when unauthenticated (e.g. Public access via AuthenticateOptional).
+// PrincipalFromCtx returns the principal kind ("user"/"auth"/"api_token"),
+// defaulting to "" when unauthenticated (e.g. Public access via AuthenticateOptional).
 func PrincipalFromCtx(ctx context.Context) string {
 	v, _ := ctx.Value(CtxKeyPrincipal).(string)
+	return v
+}
+
+// TokenPoliciesFromCtx returns the API token's policies when the principal is an
+// api_token; nil otherwise.
+func TokenPoliciesFromCtx(ctx context.Context) []apitoken.Policy {
+	v, _ := ctx.Value(CtxKeyTokenPolicies).([]apitoken.Policy)
 	return v
 }
 

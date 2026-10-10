@@ -11,14 +11,16 @@ import (
 type TriggerType string
 
 const (
-	TriggerFieldChanged TriggerType = "field_changed"
-	TriggerSchedule     TriggerType = "schedule"
+	TriggerFieldChanged  TriggerType = "field_changed"
+	TriggerSchedule      TriggerType = "schedule"
+	TriggerEntityCreated TriggerType = "entity_created"
 )
 
 type ActionType string
 
 const (
-	ActionEmailWithPDF ActionType = "email_with_pdf"
+	ActionEmailWithPDF      ActionType = "email_with_pdf"
+	ActionSendTemplateEmail ActionType = "send_template_email"
 )
 
 type RunStatus string
@@ -41,8 +43,8 @@ const (
 )
 
 type Trigger struct {
-	Type   TriggerType     `json:"type"`
-	Config map[string]any  `json:"config"`
+	Type   TriggerType    `json:"type"`
+	Config map[string]any `json:"config"`
 }
 
 type Action struct {
@@ -53,14 +55,15 @@ type Action struct {
 }
 
 type Workflow struct {
-	ID          uuid.UUID  `json:"id"`
-	Name        string     `json:"name"`
-	Active      bool       `json:"active"`
-	Trigger     Trigger    `json:"trigger"`
-	Actions     []Action   `json:"actions"`
-	LastFiredAt *time.Time `json:"last_fired_at,omitempty"`
-	CreatedAt   time.Time  `json:"created_at"`
-	UpdatedAt   time.Time  `json:"updated_at"`
+	ID           uuid.UUID  `json:"id"`
+	Name         string     `json:"name"`
+	Active       bool       `json:"active"`
+	Trigger      Trigger    `json:"trigger"`
+	Actions      []Action   `json:"actions"`
+	OriginPlugin *string    `json:"origin_plugin,omitempty"` // set when provisioned by a plugin
+	LastFiredAt  *time.Time `json:"last_fired_at,omitempty"`
+	CreatedAt    time.Time  `json:"created_at"`
+	UpdatedAt    time.Time  `json:"updated_at"`
 }
 
 func New(name string, trigger Trigger, actions []Action) *Workflow {

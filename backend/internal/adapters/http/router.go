@@ -14,13 +14,19 @@ import (
 	"github.com/imaginacolombia/cms/internal/adapters/mail/smtp"
 	pdfstub "github.com/imaginacolombia/cms/internal/adapters/pdf/stub"
 	postgresrepo "github.com/imaginacolombia/cms/internal/adapters/persistence/postgres"
-	"github.com/imaginacolombia/cms/internal/core/events"
+	storageadapter "github.com/imaginacolombia/cms/internal/adapters/storage"
 	_ "github.com/imaginacolombia/cms/internal/core/ecommerce/tenants"
+	"github.com/imaginacolombia/cms/internal/core/email"
+	"github.com/imaginacolombia/cms/internal/core/events"
+	"github.com/imaginacolombia/cms/internal/core/features"
 	_ "github.com/imaginacolombia/cms/internal/core/hooks/providers"
+	"github.com/imaginacolombia/cms/internal/core/ports/outbound"
 	"github.com/imaginacolombia/cms/internal/core/workflows"
 	"github.com/imaginacolombia/cms/internal/infrastructure/config"
+	"github.com/imaginacolombia/cms/internal/infrastructure/crypto"
 	"github.com/imaginacolombia/cms/internal/infrastructure/logger"
 	"github.com/imaginacolombia/cms/internal/infrastructure/static"
+	"github.com/imaginacolombia/cms/internal/plugins"
 )
 
 // apiError writes a JSON error body for router-level responses (404 / 405) so the
@@ -33,13 +39,36 @@ func apiError(w http.ResponseWriter, status int, msg string) {
 
 func NewRouter(ctx context.Context, cfg *config.Config, log *logger.Logger, db *pgxpool.Pool, bus events.Bus) http.Handler {
 	repos := postgresrepo.NewRepos(db)
+	storageFactory := storageadapter.NewFactory()
+
+	// Mailer for transactional email (invites, token-rotation notices). nil when
+	// SMTP is not configured, in which case features degrade gracefully.
+	var mailer outbound.Mailer
+	if cfg.SMTP.Host != "" {
+		mailer = smtp.New(cfg.SMTP)
+	}
+
+	// Encrypts secrets at rest (e.g. a tenant's own S3 secret key).
+	enc := crypto.New(cfg.Security.EncryptionKey)
+
+	// Email template engine: code-owned defaults (core + plugins) + per-tenant
+	// overrides, rendered with tenant branding.
+	emailReg := email.NewRegistry()
+	email.RegisterCoreDefaults(emailReg)
+	features.RegisterEmailTemplates(emailReg)
+	// Let premium plugins (compiled in with -tags premium) register their templates
+	// and other extensions. No-op in the OSS build.
+	plugins.ApplyAll(plugins.Deps{Email: emailReg})
+	emailRenderer := email.NewRenderer(emailReg, repos.EmailTemplate, cfg.App.Name)
 
 	var wfEngine *workflows.Engine
 	if cfg.Features.Workflows {
 		reg := workflows.NewRegistry()
 		reg.RegisterTrigger(workflows.NewFieldChangedTrigger())
 		reg.RegisterTrigger(workflows.NewScheduleTrigger())
+		reg.RegisterTrigger(workflows.NewEntityCreatedTrigger())
 		reg.RegisterAction(workflows.NewEmailWithPDFAction(smtp.New(cfg.SMTP), pdfstub.New()))
+		reg.RegisterAction(workflows.NewSendTemplateEmailAction(emailRenderer, mailer, repos.Tenant, repos.User))
 		wfEngine = workflows.NewEngine(repos.Workflow, repos.Item, repos.Tenant, reg, log, 4)
 		wfEngine.Start(bus)
 		workflows.NewScheduler(wfEngine).Start(ctx)
@@ -95,15 +124,17 @@ func NewRouter(ctx context.Context, cfg *config.Config, log *logger.Logger, db *
 		// Authenticate runs first â†’ sets CtxKeyTenantID from JWT claims.
 		// TenantResolver sees it already set and skips DB lookup.
 		r.Group(func(r chi.Router) {
+			r.Use(httpMiddleware.APITokenAuth(db, repos.APIToken))
 			r.Use(httpMiddleware.Authenticate(cfg.Auth.JWTSecret))
 			r.Use(httpMiddleware.TenantResolver(db))
 			r.Use(httpMiddleware.SuperAdminGate(cfg.SuperAdmin.AllowedIPs))
 			r.Use(httpMiddleware.ActivityTracker())
 
 			rest.MountPermissionCatalog(r, repos)
-			rest.MountUsers(r, repos, bus, log)
+			rest.MountUsers(r, repos, mailer, bus, log)
 			rest.MountRoles(r, repos, bus, log)
 			rest.MountCollections(r, repos, bus, log)
+			rest.MountCollectionGroups(r, repos, log)
 			rest.MountFields(r, repos, bus, log)
 			rest.MountSections(r, repos, bus, log)
 			rest.MountRelations(r, repos, log)
@@ -113,12 +144,15 @@ func NewRouter(ctx context.Context, cfg *config.Config, log *logger.Logger, db *
 			if wfEngine != nil {
 				rest.MountWorkflows(r, repos, wfEngine, log)
 			}
-			rest.MountSettings(r, repos, log)
+			rest.MountSettings(r, repos, cfg, enc, log)
 			rest.MountPlugins(r, repos, bus, log)
+			rest.MountFiles(r, repos, storageFactory, cfg, enc, log)
+			rest.MountAPITokens(r, repos, log)
+			rest.MountEmailTemplates(r, repos, emailReg, log)
 			rest.MountAutoGen(r)
 
 			// Tenant CRUD (protected half); /tenants/current is public
-			rest.MountTenants(publicR, r, repos, bus, log)
+			rest.MountTenants(publicR, r, repos, db, bus, log)
 		})
 
 		// Items + ecommerce quoting use optional auth: an unauthenticated
@@ -128,6 +162,7 @@ func NewRouter(ctx context.Context, cfg *config.Config, log *logger.Logger, db *
 		// (system users or "auth" principals like customers/operators) still
 		// get their normal role-based access and row-level filters.
 		r.Group(func(r chi.Router) {
+			r.Use(httpMiddleware.APITokenAuth(db, repos.APIToken))
 			r.Use(httpMiddleware.AuthenticateOptional(cfg.Auth.JWTSecret))
 			r.Use(httpMiddleware.TenantResolver(db))
 			r.Use(httpMiddleware.SuperAdminGate(cfg.SuperAdmin.AllowedIPs))

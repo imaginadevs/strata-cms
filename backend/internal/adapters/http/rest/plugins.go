@@ -74,6 +74,11 @@ func (h *pluginsHandler) install(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Provision the plugin's default workflows (idempotent; email-on-event etc.).
+	if err := features.EnsureFeatureWorkflows(r.Context(), tenantID, id, h.repos.Workflow); err != nil {
+		h.log.Warnw("plugin install: ensure workflows failed", "plugin", id, "err", err)
+	}
+
 	t.Settings.MarkPluginInstalled(string(id))
 	// Provision plugin-owned settings defaults on first activation only, so an
 	// idempotent re-install never clobbers an operator's later changes.

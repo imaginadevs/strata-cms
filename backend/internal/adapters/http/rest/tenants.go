@@ -3,9 +3,11 @@ package rest
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	httpMiddleware "github.com/imaginacolombia/cms/internal/adapters/http/middleware"
 	postgresrepo "github.com/imaginacolombia/cms/internal/adapters/persistence/postgres"
@@ -13,14 +15,15 @@ import (
 	"github.com/imaginacolombia/cms/internal/core/events"
 	"github.com/imaginacolombia/cms/internal/core/features"
 	"github.com/imaginacolombia/cms/internal/core/ports/outbound"
+	"github.com/imaginacolombia/cms/internal/infrastructure/database"
 	"github.com/imaginacolombia/cms/internal/infrastructure/logger"
 )
 
 // MountTenants registers tenant routes.
 // publicR is the unauthenticated group (for /tenants/current).
 // protectedR is the JWT group (for CRUD).
-func MountTenants(publicR, protectedR chi.Router, repos *postgresrepo.Repos, bus events.Bus, log *logger.Logger) {
-	h := &tenantHandler{repos: repos, bus: bus, log: log}
+func MountTenants(publicR, protectedR chi.Router, repos *postgresrepo.Repos, db *pgxpool.Pool, bus events.Bus, log *logger.Logger) {
+	h := &tenantHandler{repos: repos, db: db, bus: bus, log: log}
 
 	publicR.Get("/tenants/current", h.current)
 
@@ -36,8 +39,22 @@ func MountTenants(publicR, protectedR chi.Router, repos *postgresrepo.Repos, bus
 
 type tenantHandler struct {
 	repos *postgresrepo.Repos
+	db    *pgxpool.Pool
 	bus   events.Bus
 	log   *logger.Logger
+}
+
+// tenantAdminEmail builds the seeded admin login from the tenant's domain
+// (admin@<domain>), falling back to admin@<slug> when no domain is set.
+func tenantAdminEmail(t *tenant.Tenant) string {
+	host := ""
+	if t.Domain != nil {
+		host = strings.TrimSpace(*t.Domain)
+	}
+	if host == "" {
+		host = t.Slug
+	}
+	return "admin@" + host
 }
 
 // GET /api/tenants/current — public; returns the resolved tenant for branding
@@ -110,6 +127,35 @@ func (h *tenantHandler) create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Provision the tenant immediately so it's usable without a server restart:
+	// per-tenant schema + base tables, the seed admin, then any enabled feature
+	// collections. (Previously this only happened at startup via bootstrap, so a
+	// tenant created mid-run — or inserted by hand — was left unprovisioned.)
+	migrator := database.NewTenantMigrator(h.db)
+	if err := migrator.EnsureSchema(r.Context(), t.ID); err != nil {
+		h.log.Errorw("tenant provision: schema failed", "tenant", t.ID, "err", err)
+		// Roll back the row so a failed provision doesn't leave a half-created tenant.
+		_ = h.repos.Tenant.Delete(r.Context(), t.ID)
+		writeError(w, http.StatusInternalServerError, "tenant provisioning failed")
+		return
+	}
+	if err := migrator.SeedDefaults(r.Context(), t.ID, tenantAdminEmail(t)); err != nil {
+		h.log.Warnw("tenant provision: seed defaults failed", "tenant", t.ID, "err", err)
+	}
+	t.Settings.NormalizePlugins()
+	for _, id := range features.EnabledPlugins(t.Settings) {
+		if err := features.EnsureFeatureCollections(r.Context(), t.ID, id,
+			h.repos.Collection, h.repos.Field, h.repos.Section); err != nil {
+			h.log.Warnw("tenant provision: feature collections failed", "tenant", t.ID, "plugin", id, "err", err)
+		}
+		if err := features.EnsureFeatureRelations(r.Context(), t.ID, id, h.repos.Relation); err != nil {
+			h.log.Warnw("tenant provision: feature relations failed", "tenant", t.ID, "plugin", id, "err", err)
+		}
+		if err := features.EnsureFeatureWorkflows(r.Context(), t.ID, id, h.repos.Workflow); err != nil {
+			h.log.Warnw("tenant provision: feature workflows failed", "tenant", t.ID, "plugin", id, "err", err)
+		}
+	}
+
 	_ = h.bus.Publish(r.Context(), events.Event{
 		Type:     events.EventTenantCreated,
 		TenantID: t.ID,
@@ -169,13 +215,13 @@ func (h *tenantHandler) update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var body struct {
-		Name            *string           `json:"name"`
-		DefaultLanguage *string           `json:"default_language"`
-		Domain          *string           `json:"domain"`
-		Logo            *string           `json:"logo"`
-		PrimaryColor    *string           `json:"primary_color"`
-		Active          *bool             `json:"active"`
-		Settings        *tenant.Settings  `json:"settings"`
+		Name            *string          `json:"name"`
+		DefaultLanguage *string          `json:"default_language"`
+		Domain          *string          `json:"domain"`
+		Logo            *string          `json:"logo"`
+		PrimaryColor    *string          `json:"primary_color"`
+		Active          *bool            `json:"active"`
+		Settings        *tenant.Settings `json:"settings"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid body")

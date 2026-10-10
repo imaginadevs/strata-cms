@@ -10,7 +10,11 @@ import (
 
 	"net/http"
 
+	mailsmtp "github.com/imaginacolombia/cms/internal/adapters/mail/smtp"
+	postgresrepo "github.com/imaginacolombia/cms/internal/adapters/persistence/postgres"
+	"github.com/imaginacolombia/cms/internal/core/apitokens"
 	"github.com/imaginacolombia/cms/internal/core/events"
+	"github.com/imaginacolombia/cms/internal/core/ports/outbound"
 	"github.com/imaginacolombia/cms/internal/infrastructure/bootstrap"
 	"github.com/imaginacolombia/cms/internal/infrastructure/config"
 	"github.com/imaginacolombia/cms/internal/infrastructure/database"
@@ -50,6 +54,15 @@ func main() {
 	bus.SetErrorHandler(func(event events.Event, err error) {
 		log.Errorw("event handler failed", "type", event.Type, "collection", event.Collection, "err", err)
 	})
+
+	// Background job: auto-rotate monthly API tokens + email admins 24h before.
+	// Email is only attempted when SMTP is configured.
+	var mailer outbound.Mailer
+	if cfg.SMTP.Host != "" {
+		mailer = mailsmtp.New(cfg.SMTP)
+	}
+	repos := postgresrepo.NewRepos(db)
+	apitokens.NewScheduler(repos.Tenant, repos.APIToken, repos.User, mailer, log, cfg.App.Name).Start(ctx)
 
 	srv := server.New(cfg, log, db, bus)
 

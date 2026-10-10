@@ -94,6 +94,13 @@ export const put = <T>(url: string, data?: unknown) =>
 export const del = <T>(url: string) =>
   api.delete<T>(url).then((r) => r.data);
 
+// Multipart upload. Lets the browser set the multipart boundary itself by
+// clearing the instance's default JSON Content-Type for this request.
+export const upload = <T>(url: string, form: FormData) =>
+  api
+    .post<T>(url, form, { headers: { "Content-Type": "multipart/form-data" } })
+    .then((r) => r.data);
+
 // ── Error normalisation ───────────────────────────────────────────────────────
 function normaliseError(err: AxiosError<ApiError>): Error & { status?: number } {
   const msg = err.response?.data?.error ?? err.message ?? "Unknown error";

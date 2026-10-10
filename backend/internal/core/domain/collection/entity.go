@@ -27,19 +27,24 @@ const DefaultSectionName = "general"
 type Collection struct {
 	domain.Base
 
-	Name         string         `json:"name"         db:"name"`
-	DisplayName  string         `json:"display_name" db:"display_name"`
-	Type         CollectionType `json:"type"         db:"type"`
-	Icon         *string        `json:"icon"         db:"icon"`
-	Color        *string        `json:"color"        db:"color"`
-	Note         *string        `json:"note"         db:"note"`
-	IsSystem     bool           `json:"is_system"    db:"is_system"`
-	IsHidden     bool           `json:"is_hidden"    db:"is_hidden"`
-	IsSingleton  bool           `json:"is_singleton" db:"is_singleton"`
-	SortField    *string        `json:"sort_field"   db:"sort_field"`
-	Meta         map[string]any `json:"meta"         db:"meta"`
-	Sections     []Section      `json:"sections,omitempty"`
-	Translations []Translation  `json:"translations,omitempty"`
+	Name        string         `json:"name"         db:"name"`
+	DisplayName string         `json:"display_name" db:"display_name"`
+	Type        CollectionType `json:"type"         db:"type"`
+	Icon        *string        `json:"icon"         db:"icon"`
+	Color       *string        `json:"color"        db:"color"`
+	Note        *string        `json:"note"         db:"note"`
+	IsSystem    bool           `json:"is_system"    db:"is_system"`
+	IsHidden    bool           `json:"is_hidden"    db:"is_hidden"`
+	IsSingleton bool           `json:"is_singleton" db:"is_singleton"`
+	SortField   *string        `json:"sort_field"   db:"sort_field"`
+	Meta        map[string]any `json:"meta"         db:"meta"`
+	// GroupID optionally places this collection inside a CollectionGroup (sidebar
+	// folder). Nil = ungrouped. Sort is the position within its group (or among
+	// ungrouped collections) in the navigation.
+	GroupID      *uuid.UUID    `json:"group_id"     db:"group_id"`
+	Sort         int           `json:"sort"         db:"sort"`
+	Sections     []Section     `json:"sections,omitempty"`
+	Translations []Translation `json:"translations,omitempty"`
 
 	// Fields is a transient flatten used by DDL/bootstrap before sections are
 	// persisted. Never serialised in API responses — use Sections / AllFields().
@@ -183,6 +188,25 @@ type Relation struct {
 	Type           RelationType `json:"type"            db:"type"`
 	JunctionTable  *string      `json:"junction_table"  db:"junction_table"`
 	OnDelete       string       `json:"on_delete"       db:"on_delete"`
+}
+
+// CollectionGroup is a sidebar folder that collections can be organised under.
+// Groups are optional; a collection with GroupID == nil is "ungrouped".
+type CollectionGroup struct {
+	domain.Base
+
+	Name  string  `json:"name"  db:"name"`
+	Icon  *string `json:"icon"  db:"icon"`
+	Color *string `json:"color" db:"color"`
+	Sort  int     `json:"sort"  db:"sort"`
+}
+
+// CollectionPlacement is one collection's group + sort assignment, used to apply
+// drag-and-drop reordering in a single batch.
+type CollectionPlacement struct {
+	ID      uuid.UUID  `json:"id"`
+	GroupID *uuid.UUID `json:"group_id"`
+	Sort    int        `json:"sort"`
 }
 
 type RelationType string

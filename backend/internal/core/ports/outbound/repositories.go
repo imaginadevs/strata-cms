@@ -6,12 +6,13 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/imaginacolombia/cms/internal/core/domain/apitoken"
 	"github.com/imaginacolombia/cms/internal/core/domain/audit"
 	"github.com/imaginacolombia/cms/internal/core/domain/collection"
 	"github.com/imaginacolombia/cms/internal/core/domain/notification"
-	"github.com/imaginacolombia/cms/internal/core/domain/workflow"
 	"github.com/imaginacolombia/cms/internal/core/domain/tenant"
 	"github.com/imaginacolombia/cms/internal/core/domain/user"
+	"github.com/imaginacolombia/cms/internal/core/domain/workflow"
 )
 
 // ─── Tenant ───────────────────────────────────────────────────────────────────
@@ -24,6 +25,9 @@ type TenantRepository interface {
 	Update(ctx context.Context, t *tenant.Tenant) error
 	List(ctx context.Context, filter TenantFilter) ([]*tenant.Tenant, int64, error)
 	Delete(ctx context.Context, id uuid.UUID) error
+	// AddStorageUsed adjusts the tenant's storage_used_bytes counter by delta
+	// (negative to release). Floors at zero. Used for file upload/delete accounting.
+	AddStorageUsed(ctx context.Context, id uuid.UUID, delta int64) error
 }
 
 type TenantFilter struct {
@@ -44,6 +48,15 @@ type UserRepository interface {
 	List(ctx context.Context, tenantID uuid.UUID, filter UserFilter) ([]*user.User, int64, error)
 	SetPassword(ctx context.Context, tenantID, userID uuid.UUID, hash string) error
 	RecordLogin(ctx context.Context, tenantID, userID uuid.UUID) error
+	// ListAdminEmails returns active users who are super admins or hold the
+	// Administrator role — used for admin-wide notifications.
+	ListAdminEmails(ctx context.Context, tenantID uuid.UUID) ([]string, error)
+	// SetInvite stores an invite token hash + expiry on a pending user.
+	SetInvite(ctx context.Context, tenantID, userID uuid.UUID, tokenHash string, expiresAt time.Time) error
+	// GetByInviteToken finds a user by invite token hash (nil if none).
+	GetByInviteToken(ctx context.Context, tenantID uuid.UUID, tokenHash string) (*user.User, error)
+	// AcceptInvite sets the password, activates the account, and clears the invite.
+	AcceptInvite(ctx context.Context, tenantID, userID uuid.UUID, passwordHash string) error
 }
 
 type UserFilter struct {
@@ -82,7 +95,6 @@ type PermissionRepository interface {
 	GetForRoleNames(ctx context.Context, tenantID uuid.UUID, roleNames []string, collection string, action user.Action) (*user.Permission, error)
 }
 
-
 // ─── Notifications ────────────────────────────────────────────────────────────
 
 type NotificationFilter struct {
@@ -109,6 +121,8 @@ type CollectionRepository interface {
 	Update(ctx context.Context, tenantID uuid.UUID, c *collection.Collection) error
 	Delete(ctx context.Context, tenantID uuid.UUID, name string) error
 	List(ctx context.Context, tenantID uuid.UUID, includeHidden bool) ([]*collection.Collection, error)
+	// ReorderCollections applies group membership + sort to many collections at once.
+	ReorderCollections(ctx context.Context, tenantID uuid.UUID, items []collection.CollectionPlacement) error
 
 	// DDL operations — executed inside transactions against the live schema
 	CreateTable(ctx context.Context, tenantID uuid.UUID, c *collection.Collection) error
@@ -128,6 +142,25 @@ type CollectionRepository interface {
 	AddCompositeUnique(ctx context.Context, tenantID uuid.UUID, tableName string, columns []string) error
 }
 
+type CollectionGroupRepository interface {
+	List(ctx context.Context, tenantID uuid.UUID) ([]*collection.CollectionGroup, error)
+	GetByID(ctx context.Context, tenantID, id uuid.UUID) (*collection.CollectionGroup, error)
+	Create(ctx context.Context, tenantID uuid.UUID, g *collection.CollectionGroup) error
+	Update(ctx context.Context, tenantID uuid.UUID, g *collection.CollectionGroup) error
+	Delete(ctx context.Context, tenantID, id uuid.UUID) error
+	Reorder(ctx context.Context, tenantID uuid.UUID, orderedIDs []uuid.UUID) error
+}
+
+// APITokenRepository persists policy-scoped programmatic access tokens.
+type APITokenRepository interface {
+	Create(ctx context.Context, tenantID uuid.UUID, t *apitoken.APIToken) error
+	List(ctx context.Context, tenantID uuid.UUID) ([]*apitoken.APIToken, error)
+	GetByID(ctx context.Context, tenantID, id uuid.UUID) (*apitoken.APIToken, error)
+	GetByPrefix(ctx context.Context, tenantID uuid.UUID, prefix string) (*apitoken.APIToken, error)
+	Update(ctx context.Context, tenantID uuid.UUID, t *apitoken.APIToken) error
+	Delete(ctx context.Context, tenantID, id uuid.UUID) error
+	TouchLastUsed(ctx context.Context, tenantID, id uuid.UUID, at time.Time) error
+}
 
 type SectionRepository interface {
 	Create(ctx context.Context, tenantID uuid.UUID, s *collection.Section) error
@@ -271,6 +304,8 @@ type WorkflowRepository interface {
 	List(ctx context.Context, tenantID uuid.UUID, filter WorkflowFilter) ([]*workflow.Workflow, int64, error)
 	ListActiveByTrigger(ctx context.Context, tenantID uuid.UUID, triggerType workflow.TriggerType) ([]*workflow.Workflow, error)
 	SetLastFiredAt(ctx context.Context, tenantID, id uuid.UUID, at time.Time) error
+	// CountByOrigin counts workflows provisioned by a given plugin (for idempotent install).
+	CountByOrigin(ctx context.Context, tenantID uuid.UUID, originPlugin string) (int, error)
 
 	CreateRun(ctx context.Context, tenantID uuid.UUID, run *workflow.Run) error
 	UpdateRun(ctx context.Context, tenantID uuid.UUID, run *workflow.Run) error

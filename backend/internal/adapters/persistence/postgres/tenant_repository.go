@@ -68,6 +68,16 @@ func (r *tenantRepository) Update(ctx context.Context, t *tenantdomain.Tenant) e
 	return err
 }
 
+func (r *tenantRepository) AddStorageUsed(ctx context.Context, id uuid.UUID, delta int64) error {
+	_, err := r.db.Exec(ctx, `
+		UPDATE tenants
+		SET storage_used_bytes = GREATEST(0, storage_used_bytes + $1)
+		WHERE id = $2`,
+		delta, id,
+	)
+	return err
+}
+
 func (r *tenantRepository) List(ctx context.Context, filter outbound.TenantFilter) ([]*tenantdomain.Tenant, int64, error) {
 	page, limit := normalisePage(filter.Page, filter.Limit)
 	offset := (page - 1) * limit

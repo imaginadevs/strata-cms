@@ -9,7 +9,7 @@ import { createPortal } from "react-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AnimatePresence, motion } from "framer-motion";
 import * as Select from "@radix-ui/react-select";
-import { ChevronDown, Plus, Shield, Trash2, X } from "lucide-react";
+import { ChevronDown, Plus, Shield, Trash2, X, Copy, Check, Mail, AlertTriangle } from "lucide-react";
 import { del, get, patch, post } from "@/lib/api";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -32,6 +32,7 @@ type UpdateUserBody = {
 
 export default function UsersPage() {
   const [editing, setEditing] = useState<User | null>(null);
+  const [inviting, setInviting] = useState(false);
   const { data, isLoading } = useQuery({
     queryKey: ["users"],
     queryFn: () => get<PaginatedResponse<User>>("/users"),
@@ -46,7 +47,7 @@ export default function UsersPage() {
             {data?.total ?? 0} total users
           </p>
         </div>
-        <Button type="button" disabled title="Coming soon">
+        <Button type="button" onClick={() => setInviting(true)}>
           <Plus size={16} />
           Invite User
         </Button>
@@ -154,6 +155,8 @@ export default function UsersPage() {
           <EditUserPanel user={editing} onClose={() => setEditing(null)} />
         )}
       </AnimatePresence>
+
+      <InviteUserPanel open={inviting} onClose={() => setInviting(false)} />
     </div>
   );
 }
@@ -517,6 +520,148 @@ function EditUserPanel({ user, onClose }: { user: User; onClose: () => void }) {
         </form>
       </motion.aside>
     </>,
+    document.body,
+  );
+}
+
+// ── Invite user panel ───────────────────────────────────────────────────────────
+
+function InviteUserPanel({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const qc = useQueryClient();
+  const [email, setEmail] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [roleIds, setRoleIds] = useState<string[]>([]);
+  const [result, setResult] = useState<{ invite_link: string; email_sent: boolean } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  const { data: rolesResp } = useQuery({
+    queryKey: ["roles"],
+    queryFn: () => get<PaginatedResponse<Role>>("/roles"),
+    enabled: open,
+  });
+  const roles = rolesResp?.data ?? [];
+
+  function reset() {
+    setEmail(""); setFirstName(""); setLastName(""); setRoleIds([]);
+    setResult(null); setError(null); setCopied(false);
+  }
+  function close() { reset(); onClose(); }
+
+  const mutation = useMutation({
+    mutationFn: () =>
+      post<{ invite_link: string; email_sent: boolean }>("/users/invite", {
+        email, first_name: firstName, last_name: lastName, role_ids: roleIds,
+      }),
+    onSuccess: (res) => {
+      setResult({ invite_link: res.invite_link, email_sent: res.email_sent });
+      qc.invalidateQueries({ queryKey: ["users"] });
+    },
+    onError: (e: Error) => setError(e.message),
+  });
+
+  const toggleRole = (id: string) =>
+    setRoleIds((prev) => (prev.includes(id) ? prev.filter((r) => r !== id) : [...prev, id]));
+
+  return createPortal(
+    <AnimatePresence>
+      {open && (
+        <>
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            transition={{ duration: 0.18 }}
+            className="fixed inset-0 z-40 bg-black/20 backdrop-blur-[2px]"
+            onClick={close}
+          />
+          <motion.aside
+            initial={{ x: "100%" }} animate={{ x: 0 }} exit={{ x: "100%" }}
+            transition={{ type: "spring", damping: 28, stiffness: 280 }}
+            className="fixed right-0 top-0 z-50 flex h-full w-full max-w-sm flex-col bg-white shadow-2xl dark:bg-slate-900"
+          >
+            <div className="flex shrink-0 items-center justify-between border-b border-slate-100 px-6 py-5 dark:border-white/10">
+              <h2 className="flex items-center gap-2 text-base font-semibold text-slate-900 dark:text-slate-100">
+                <Mail size={17} className="text-slate-400" />
+                Invite user
+              </h2>
+              <button type="button" onClick={close} className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 dark:hover:bg-white/5">
+                <X size={18} />
+              </button>
+            </div>
+
+            {result ? (
+              <div className="flex-1 space-y-4 overflow-y-auto px-6 py-6">
+                <div className="flex items-start gap-2 rounded-xl bg-emerald-50 px-3 py-2.5 text-sm text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300">
+                  <Check size={15} className="mt-0.5 shrink-0" />
+                  {result.email_sent
+                    ? `Invitation emailed to ${email}.`
+                    : `User created. Email isn't configured — share this invite link manually.`}
+                </div>
+                <div>
+                  <label className="mb-1.5 block text-xs font-medium text-slate-700 dark:text-slate-200">Invite link</label>
+                  <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 p-2.5 dark:border-white/10 dark:bg-white/5">
+                    <code className="flex-1 break-all font-mono text-xs text-slate-700 dark:text-slate-200">{result.invite_link}</code>
+                    <button type="button"
+                      onClick={() => { navigator.clipboard?.writeText(result.invite_link); setCopied(true); setTimeout(() => setCopied(false), 1500); }}
+                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition hover:bg-white dark:border-white/10 dark:hover:bg-white/10">
+                      {copied ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
+                    </button>
+                  </div>
+                  <p className="mt-1 text-xs text-slate-400">Valid for 7 days. The recipient sets their password to activate the account.</p>
+                </div>
+                <div className="flex gap-2 pt-2">
+                  <Button variant="ghost" onClick={reset}>Invite another</Button>
+                  <Button onClick={close}>Done</Button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <div className="flex-1 space-y-5 overflow-y-auto px-6 py-6">
+                  <div>
+                    <label className="mb-1.5 block text-xs font-medium text-slate-700 dark:text-slate-200">Email <span className="text-red-400">*</span></label>
+                    <input className="input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="person@company.com" />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="mb-1.5 block text-xs font-medium text-slate-700 dark:text-slate-200">First name</label>
+                      <input className="input" value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="Jane" />
+                    </div>
+                    <div>
+                      <label className="mb-1.5 block text-xs font-medium text-slate-700 dark:text-slate-200">Last name</label>
+                      <input className="input" value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="Doe" />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="mb-1.5 block text-xs font-medium text-slate-700 dark:text-slate-200">Roles</label>
+                    <div className="space-y-1.5">
+                      {roles.length === 0 && <p className="text-xs text-slate-400">No roles available.</p>}
+                      {roles.map((role) => (
+                        <label key={role.id} className="flex cursor-pointer items-center gap-2.5 rounded-lg border border-slate-100 px-3 py-2 dark:border-white/10">
+                          <input type="checkbox" checked={roleIds.includes(role.id)} onChange={() => toggleRole(role.id)}
+                            className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-400 dark:border-white/10" />
+                          <span className="text-sm text-slate-700 dark:text-slate-200">{role.name}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                  {error && (
+                    <div className="flex items-start gap-2 rounded-xl bg-red-50 px-3 py-2.5 text-sm text-red-600 dark:bg-red-500/10 dark:text-red-400">
+                      <AlertTriangle size={14} className="mt-0.5 shrink-0" />{error}
+                    </div>
+                  )}
+                </div>
+                <div className="flex shrink-0 items-center justify-end gap-2 border-t border-slate-100 px-6 py-4 dark:border-white/10">
+                  <Button variant="ghost" onClick={close}>Cancel</Button>
+                  <Button onClick={() => { setError(null); mutation.mutate(); }} loading={mutation.isPending} disabled={!email.trim()}>
+                    Send invite
+                  </Button>
+                </div>
+              </>
+            )}
+          </motion.aside>
+        </>
+      )}
+    </AnimatePresence>,
     document.body,
   );
 }

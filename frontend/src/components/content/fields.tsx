@@ -5,7 +5,7 @@
  * form and nested sub-item (relation) rows. Keep these presentation-only and
  * schema-driven — no collection-specific logic.
  */
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
 import * as Select from "@radix-ui/react-select";
@@ -13,8 +13,9 @@ import * as Switch from "@radix-ui/react-switch";
 import * as Popover from "@radix-ui/react-popover";
 import {
   X, ChevronDown, EyeOff, RefreshCw, Clock, Check, Globe,
+  Upload, File as FileIcon, ExternalLink,
 } from "lucide-react";
-import { get } from "@/lib/api";
+import { get, upload } from "@/lib/api";
 import { RichTextEditor } from "@/components/ui/RichTextEditor";
 import type { Field, PaginatedResponse, Tenant, TenantSettings } from "@/types";
 
@@ -161,6 +162,10 @@ export function RelationInput({
 
   const relatedCollection = (field.options as Record<string, unknown>)
     ?.related_collection as string | undefined;
+  // display_field is configured when the relation is created; it names the column
+  // of the related collection to render as the label instead of the raw UUID.
+  const displayField = (field.options as Record<string, unknown>)
+    ?.display_field as string | undefined;
 
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -172,6 +177,15 @@ export function RelationInput({
         `/items/${relatedCollection}?limit=100`
       ),
     enabled: !!relatedCollection && open,
+  });
+
+  // Resolve the currently-selected item's label up front so the field shows a
+  // readable value immediately, without the user having to open the picker.
+  const { data: selectedItem } = useQuery({
+    queryKey: ["relation-item", relatedCollection, value],
+    queryFn: () =>
+      get<Record<string, unknown>>(`/items/${relatedCollection}/${value}`),
+    enabled: !!relatedCollection && value != null && value !== "",
   });
 
   if (!relatedCollection) {
@@ -192,6 +206,13 @@ export function RelationInput({
   const systemKeys = new Set(["id", "tenant_id", "created_at", "updated_at", "created_by", "updated_by"]);
 
   function getDisplayValue(item: Record<string, unknown>): string {
+    // Prefer the configured display field when present and non-empty.
+    if (displayField) {
+      const v = item[displayField];
+      if (typeof v === "string" && v.length > 0) return v;
+      if (typeof v === "number") return String(v);
+    }
+    // Fall back to the first human-readable field (legacy relations with no display_field).
     for (const [k, v] of Object.entries(item)) {
       if (systemKeys.has(k)) continue;
       if (typeof v === "string" && v.length > 0) return v;
@@ -210,7 +231,9 @@ export function RelationInput({
   const currentDisplay = value
     ? (() => {
         const found = (relatedItems?.data ?? []).find((i) => i.id === value);
-        return found ? getDisplayValue(found) : String(value);
+        if (found) return getDisplayValue(found);
+        if (selectedItem) return getDisplayValue(selectedItem);
+        return String(value);
       })()
     : null;
 
@@ -281,6 +304,201 @@ export function RelationInput({
         </Popover.Content>
       </Popover.Portal>
     </Popover.Root>
+  );
+}
+
+// ── File / image inputs ───────────────────────────────────────────────────────
+
+/** Metadata returned by GET/POST /files — `url` is presigned (private) or CDN (public). */
+interface StoredFile {
+  id: string;
+  filename: string;
+  content_type: string;
+  size: number;
+  is_public: boolean;
+  url: string;
+}
+
+function formatBytes(n: number): string {
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(0)} KB`;
+  return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+/** A single stored file, resolved by id, shown as an image thumbnail or a file chip. */
+function FileCard({ id, onRemove }: { id: string; onRemove: () => void }) {
+  const { data: file, isLoading } = useQuery({
+    queryKey: ["file", id],
+    queryFn: () => get<StoredFile>(`/files/${id}`),
+    enabled: !!id,
+  });
+
+  const isImage = file?.content_type?.startsWith("image/");
+
+  return (
+    <div className="flex items-center gap-3 rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 p-2">
+      <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-md bg-slate-100 dark:bg-white/10">
+        {isImage && file?.url ? (
+          <img src={file.url} alt={file.filename} className="h-full w-full object-cover" />
+        ) : (
+          <FileIcon size={18} className="text-slate-400" />
+        )}
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm text-slate-800 dark:text-slate-100">
+          {isLoading ? "Loading…" : file?.filename ?? id}
+        </p>
+        {file && (
+          <p className="text-xs text-slate-400">
+            {formatBytes(file.size)}
+            {file.is_public ? " · public" : " · private"}
+          </p>
+        )}
+      </div>
+      {file?.url && (
+        <a
+          href={file.url}
+          target="_blank"
+          rel="noreferrer"
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-slate-200 dark:border-white/10 text-slate-400 transition hover:text-slate-600 dark:hover:text-slate-200"
+          title="Open"
+        >
+          <ExternalLink size={13} />
+        </a>
+      )}
+      <button
+        type="button"
+        onClick={onRemove}
+        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-slate-200 dark:border-white/10 text-slate-400 transition hover:bg-red-50 dark:hover:bg-red-500/10 hover:text-red-500 dark:hover:text-red-400"
+        title="Remove"
+      >
+        <X size={13} />
+      </button>
+    </div>
+  );
+}
+
+const uploadBtn =
+  "flex items-center gap-2 rounded-lg border border-dashed border-slate-300 dark:border-white/15 bg-white dark:bg-white/5 px-3 py-2 text-sm font-medium text-slate-600 dark:text-slate-300 transition hover:border-brand-400 hover:text-brand-600 dark:hover:text-brand-300 disabled:cursor-not-allowed disabled:opacity-60";
+
+/** Hidden <input type=file> + a trigger button; uploads then calls onUploaded(id). */
+function useFileUpload(onUploaded: (id: string) => void, multiple: boolean) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadErr, setUploadErr] = useState<string | null>(null);
+
+  async function handleFiles(list: FileList | null) {
+    if (!list || list.length === 0) return;
+    setUploading(true);
+    setUploadErr(null);
+    try {
+      const chosen = multiple ? Array.from(list) : [list[0]];
+      for (const f of chosen) {
+        const form = new FormData();
+        form.append("file", f);
+        const res = await upload<StoredFile>("/files", form);
+        onUploaded(res.id);
+      }
+    } catch (e) {
+      setUploadErr(e instanceof Error ? e.message : "upload failed");
+    } finally {
+      setUploading(false);
+      if (inputRef.current) inputRef.current.value = "";
+    }
+  }
+
+  return { inputRef, uploading, uploadErr, handleFiles };
+}
+
+/** Single-file field: stores the file id (uuid) as a string. */
+export function FileInput({
+  value,
+  onChange,
+}: {
+  field: Field;
+  value: unknown;
+  onChange: (v: unknown) => void;
+  error?: string;
+}) {
+  const id = typeof value === "string" && value ? value : null;
+  const { inputRef, uploading, uploadErr, handleFiles } = useFileUpload(
+    (fileId) => onChange(fileId),
+    false,
+  );
+
+  return (
+    <div className="space-y-2">
+      <input
+        ref={inputRef}
+        type="file"
+        className="hidden"
+        onChange={(e) => handleFiles(e.target.files)}
+      />
+      {id ? (
+        <FileCard id={id} onRemove={() => onChange(null)} />
+      ) : (
+        <button type="button" className={uploadBtn} onClick={() => inputRef.current?.click()} disabled={uploading}>
+          <Upload size={14} />
+          {uploading ? "Uploading…" : "Upload file"}
+        </button>
+      )}
+      {uploadErr && <p className="text-xs text-red-500 dark:text-red-400">{uploadErr}</p>}
+    </div>
+  );
+}
+
+/** Multi-file field: stores a JSON array of file ids as a string. */
+export function FilesInput({
+  value,
+  onChange,
+}: {
+  field: Field;
+  value: unknown;
+  onChange: (v: unknown) => void;
+  error?: string;
+}) {
+  const ids: string[] = (() => {
+    if (Array.isArray(value)) return value as string[];
+    if (typeof value === "string" && value.trim()) {
+      try {
+        const parsed = JSON.parse(value);
+        return Array.isArray(parsed) ? parsed : [];
+      } catch {
+        return [];
+      }
+    }
+    return [];
+  })();
+
+  const commit = (next: string[]) => onChange(next.length ? JSON.stringify(next) : null);
+
+  const { inputRef, uploading, uploadErr, handleFiles } = useFileUpload(
+    (fileId) => commit([...ids, fileId]),
+    true,
+  );
+
+  return (
+    <div className="space-y-2">
+      <input
+        ref={inputRef}
+        type="file"
+        multiple
+        className="hidden"
+        onChange={(e) => handleFiles(e.target.files)}
+      />
+      {ids.length > 0 && (
+        <div className="space-y-2">
+          {ids.map((fid, i) => (
+            <FileCard key={fid + i} id={fid} onRemove={() => commit(ids.filter((_, idx) => idx !== i))} />
+          ))}
+        </div>
+      )}
+      <button type="button" className={uploadBtn} onClick={() => inputRef.current?.click()} disabled={uploading}>
+        <Upload size={14} />
+        {uploading ? "Uploading…" : "Add file(s)"}
+      </button>
+      {uploadErr && <p className="text-xs text-red-500 dark:text-red-400">{uploadErr}</p>}
+    </div>
   );
 }
 
@@ -505,6 +723,12 @@ export function FieldInput({
           placeholder="192.168.1.1 or 2001:db8::1"
         />
       );
+
+    case "file":
+      return <FileInput field={field} value={value} onChange={onChange} error={error} />;
+
+    case "files":
+      return <FilesInput field={field} value={value} onChange={onChange} error={error} />;
 
     case "relation":
       return (

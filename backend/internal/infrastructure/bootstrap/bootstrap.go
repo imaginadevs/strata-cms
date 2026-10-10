@@ -89,6 +89,11 @@ func ensureAllFeatureCollections(ctx context.Context, repos *postgresrepo.Repos,
 				log.Errorw("bootstrap: ensure plugin relations",
 					"tenant", t.ID, "plugin", id, "err", err)
 			}
+			if err := features.EnsureFeatureWorkflows(ctx, t.ID,
+				id, repos.Workflow); err != nil {
+				log.Errorw("bootstrap: ensure plugin workflows",
+					"tenant", t.ID, "plugin", id, "err", err)
+			}
 		}
 	}
 

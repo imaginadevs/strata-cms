@@ -52,22 +52,45 @@ func (m *Mailer) Send(_ context.Context, msg outbound.Message) error {
 	b.WriteString(fmt.Sprintf("Subject: %s\r\n", msg.Subject))
 	b.WriteString("MIME-Version: 1.0\r\n")
 
-	boundary := "cms-wf-boundary"
+	const altBoundary = "cms-alt-boundary"
+	const mixedBoundary = "cms-mixed-boundary"
+	hasHTML := strings.TrimSpace(msg.HTMLBody) != ""
+
+	// writeContent emits the message content as a single MIME part: a
+	// multipart/alternative (text + HTML) when an HTML body is present, else a
+	// plain text/plain part. It writes its own Content-Type header so it is valid
+	// both at the top level and nested inside a multipart/mixed wrapper.
+	writeContent := func(w *strings.Builder) {
+		if hasHTML {
+			w.WriteString(fmt.Sprintf("Content-Type: multipart/alternative; boundary=%s\r\n\r\n", altBoundary))
+			w.WriteString(fmt.Sprintf("--%s\r\n", altBoundary))
+			w.WriteString("Content-Type: text/plain; charset=UTF-8\r\n\r\n")
+			w.WriteString(msg.Body)
+			w.WriteString("\r\n")
+			w.WriteString(fmt.Sprintf("--%s\r\n", altBoundary))
+			w.WriteString("Content-Type: text/html; charset=UTF-8\r\n\r\n")
+			w.WriteString(msg.HTMLBody)
+			w.WriteString("\r\n")
+			w.WriteString(fmt.Sprintf("--%s--\r\n", altBoundary))
+		} else {
+			w.WriteString("Content-Type: text/plain; charset=UTF-8\r\n\r\n")
+			w.WriteString(msg.Body)
+		}
+	}
+
 	if len(msg.Attachments) == 0 {
-		b.WriteString("Content-Type: text/plain; charset=UTF-8\r\n\r\n")
-		b.WriteString(msg.Body)
+		writeContent(&b)
 	} else {
-		b.WriteString(fmt.Sprintf("Content-Type: multipart/mixed; boundary=%s\r\n\r\n", boundary))
-		b.WriteString(fmt.Sprintf("--%s\r\n", boundary))
-		b.WriteString("Content-Type: text/plain; charset=UTF-8\r\n\r\n")
-		b.WriteString(msg.Body)
+		b.WriteString(fmt.Sprintf("Content-Type: multipart/mixed; boundary=%s\r\n\r\n", mixedBoundary))
+		b.WriteString(fmt.Sprintf("--%s\r\n", mixedBoundary))
+		writeContent(&b)
 		b.WriteString("\r\n")
 		for _, att := range msg.Attachments {
 			ct := att.ContentType
 			if ct == "" {
 				ct = "application/octet-stream"
 			}
-			b.WriteString(fmt.Sprintf("--%s\r\n", boundary))
+			b.WriteString(fmt.Sprintf("--%s\r\n", mixedBoundary))
 			b.WriteString(fmt.Sprintf("Content-Type: %s; name=\"%s\"\r\n", ct, att.Filename))
 			b.WriteString("Content-Transfer-Encoding: base64\r\n")
 			b.WriteString(fmt.Sprintf("Content-Disposition: attachment; filename=\"%s\"\r\n\r\n", att.Filename))
@@ -81,7 +104,7 @@ func (m *Mailer) Send(_ context.Context, msg outbound.Message) error {
 				b.WriteString("\r\n")
 			}
 		}
-		b.WriteString(fmt.Sprintf("--%s--\r\n", boundary))
+		b.WriteString(fmt.Sprintf("--%s--\r\n", mixedBoundary))
 	}
 
 	recipients := append([]string{}, msg.To...)

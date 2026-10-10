@@ -12,7 +12,8 @@ import (
 // StorageConfig holds S3-compatible credentials.
 //
 // Default (global): one bucket for all tenants, files stored under
-//   tenants/{tenant_id}/{collection}/{uuid}.ext
+//
+//	tenants/{tenant_id}/{collection}/{uuid}.ext
 //
 // S3 internal sharding is by key-prefix hash — prefix-per-tenant paths
 // perform identically to separate buckets. Using one bucket avoids AWS's
@@ -22,8 +23,8 @@ import (
 // (stored encrypted in tenants.settings.storage_config). The StorageFactory
 // uses the tenant override when present, otherwise falls back to global config.
 type StorageConfig struct {
-	Provider       string `json:"provider"`         // "s3" | "r2" | "minio"
-	Endpoint       string `json:"endpoint"`         // custom endpoint (MinIO, R2)
+	Provider       string `json:"provider"` // "s3" | "r2" | "minio"
+	Endpoint       string `json:"endpoint"` // custom endpoint (MinIO, R2)
 	Region         string `json:"region"`
 	Bucket         string `json:"bucket"`
 	AccessKeyID    string `json:"access_key_id"`
@@ -43,15 +44,17 @@ func StorageKey(tenantID, collection, uuid, ext string) string {
 
 // FileObject represents a stored file's metadata (not the binary content).
 type FileObject struct {
-	ID           uuid.UUID `json:"id"`
-	TenantID     uuid.UUID `json:"tenant_id"`
-	Filename     string    `json:"filename"`
-	StorageKey   string    `json:"storage_key"`  // S3 key
-	ContentType  string    `json:"content_type"`
-	Size         int64     `json:"size"`
-	URL          string    `json:"url"`
-	UploadedBy   *uuid.UUID `json:"uploaded_by"`
-	CreatedAt    time.Time `json:"created_at"`
+	ID          uuid.UUID  `json:"id"`
+	TenantID    uuid.UUID  `json:"tenant_id"`
+	Filename    string     `json:"filename"`
+	StorageKey  string     `json:"storage_key"` // S3 key
+	ContentType string     `json:"content_type"`
+	Size        int64      `json:"size"`
+	Collection  string     `json:"collection"`
+	IsPublic    bool       `json:"is_public"`
+	URL         string     `json:"url"` // computed on read: CDN (public) or presigned (private)
+	UploadedBy  *uuid.UUID `json:"uploaded_by"`
+	CreatedAt   time.Time  `json:"created_at"`
 }
 
 // StorageAdapter is the port that the storage adapter must implement.
@@ -84,25 +87,28 @@ type FileRepository interface {
 	GetByID(ctx context.Context, tenantID, id uuid.UUID) (*FileObject, error)
 	List(ctx context.Context, tenantID uuid.UUID, page, limit int) ([]*FileObject, int64, error)
 	Delete(ctx context.Context, tenantID, id uuid.UUID) error
+	SetPublic(ctx context.Context, tenantID, id uuid.UUID, isPublic bool) error
 }
 
 // StorageQuota manages per-tenant storage accounting.
 //
 // Why DB tracking (not S3 metrics):
-//   AWS S3 / compatible storage never reports per-prefix usage in real time.
-//   CloudWatch bucket metrics update once daily — useless for upload-time enforcement.
-//   DB counters give sub-millisecond quota checks with no extra S3 API calls.
+//
+//	AWS S3 / compatible storage never reports per-prefix usage in real time.
+//	CloudWatch bucket metrics update once daily — useless for upload-time enforcement.
+//	DB counters give sub-millisecond quota checks with no extra S3 API calls.
 //
 // Enforcement pattern (inside a single DB transaction):
-//   1. Call Claim(tenantID, fileSize)  — atomically checks quota and increments counter.
-//      Returns ErrQuotaExceeded if the upload would exceed the limit.
-//   2. On success: stream the file to S3.
-//   3. On S3 error: call Release(tenantID, fileSize) to roll back the counter.
-//   4. On file deletion: call Release(tenantID, fileSize).
+//  1. Call Claim(tenantID, fileSize)  — atomically checks quota and increments counter.
+//     Returns ErrQuotaExceeded if the upload would exceed the limit.
+//  2. On success: stream the file to S3.
+//  3. On S3 error: call Release(tenantID, fileSize) to roll back the counter.
+//  4. On file deletion: call Release(tenantID, fileSize).
 //
 // Reconciliation:
-//   Query the storage_drift view to detect counter drift after crashes.
-//   Run periodically (e.g. nightly cron) and call Reconcile to fix drift.
+//
+//	Query the storage_drift view to detect counter drift after crashes.
+//	Run periodically (e.g. nightly cron) and call Reconcile to fix drift.
 type StorageQuota interface {
 	// Claim atomically checks and reserves space for an upload.
 	// Returns ErrQuotaExceeded if tenant.storage_quota_bytes would be breached.

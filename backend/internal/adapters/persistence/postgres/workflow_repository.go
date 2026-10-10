@@ -30,9 +30,9 @@ func (r *workflowRepository) Create(ctx context.Context, tenantID uuid.UUID, wf 
 	defer tx.Rollback(ctx) //nolint:errcheck
 
 	_, err = tx.Exec(ctx, fmt.Sprintf(`
-		INSERT INTO %s.workflows (id, name, active, trigger_type, trigger_config, last_fired_at, created_at, updated_at)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`, s),
-		wf.ID, wf.Name, wf.Active, string(wf.Trigger.Type), trigJSON, wf.LastFiredAt, wf.CreatedAt, wf.UpdatedAt,
+		INSERT INTO %s.workflows (id, name, active, trigger_type, trigger_config, origin_plugin, last_fired_at, created_at, updated_at)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`, s),
+		wf.ID, wf.Name, wf.Active, string(wf.Trigger.Type), trigJSON, wf.OriginPlugin, wf.LastFiredAt, wf.CreatedAt, wf.UpdatedAt,
 	)
 	if err != nil {
 		return err
@@ -52,6 +52,14 @@ func (r *workflowRepository) Create(ctx context.Context, tenantID uuid.UUID, wf 
 		}
 	}
 	return tx.Commit(ctx)
+}
+
+func (r *workflowRepository) CountByOrigin(ctx context.Context, tenantID uuid.UUID, originPlugin string) (int, error) {
+	var n int
+	err := r.db.QueryRow(ctx,
+		fmt.Sprintf(`SELECT COUNT(*) FROM %s.workflows WHERE origin_plugin=$1`, schemaOf(tenantID)),
+		originPlugin).Scan(&n)
+	return n, err
 }
 
 func (r *workflowRepository) Update(ctx context.Context, tenantID uuid.UUID, wf *wfdomain.Workflow) error {

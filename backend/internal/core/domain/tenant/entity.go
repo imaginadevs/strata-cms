@@ -83,6 +83,33 @@ func DefaultEcommerceSettings() EcommerceSettings {
 	return EcommerceSettings{TrackInventory: false, AllowBackorder: false}
 }
 
+// StorageSettings is a tenant's file-storage configuration. When Inherit is true
+// (or the fields below are incomplete) the tenant uses the environment/default S3
+// credentials, with files stored under tenants/{tenant_id}/… in the default
+// bucket. Otherwise the tenant's own S3 credentials are used.
+type StorageSettings struct {
+	Inherit        bool   `json:"inherit"`
+	Endpoint       string `json:"endpoint"`
+	Region         string `json:"region"`
+	Bucket         string `json:"bucket"`
+	AccessKeyID    string `json:"access_key_id"`
+	SecretKey      string `json:"secret_key"`
+	PublicBaseURL  string `json:"public_base_url"`
+	CDNBaseURL     string `json:"cdn_base_url"`
+	ForcePathStyle bool   `json:"force_path_style"`
+}
+
+// Configured reports whether the tenant supplied its own usable S3 credentials.
+func (s StorageSettings) Configured() bool {
+	return s.Bucket != "" && s.AccessKeyID != "" && s.SecretKey != ""
+}
+
+// UseOwn reports whether the tenant's own S3 config should be used (vs. the
+// environment/default). Inherit always wins; otherwise own creds must be complete.
+func (s StorageSettings) UseOwn() bool {
+	return !s.Inherit && s.Configured()
+}
+
 // Settings holds tenant-scoped configuration stored as JSONB.
 type Settings struct {
 	AllowRegistration bool              `json:"allow_registration"`
@@ -92,6 +119,7 @@ type Settings struct {
 	Features          Features          `json:"features"`
 	Plugins           Plugins           `json:"plugins"`
 	Ecommerce         EcommerceSettings `json:"ecommerce"`
+	Storage           StorageSettings   `json:"storage"`
 	// Languages is the list of ISO 639-1 language codes enabled for this tenant.
 	// The first entry is treated as the default.  An empty slice defaults to ["en"].
 	Languages []string `json:"languages,omitempty"`

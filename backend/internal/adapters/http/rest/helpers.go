@@ -1,6 +1,9 @@
 package rest
 
 import (
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"net/http"
 	"reflect"
@@ -9,6 +12,23 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 )
+
+// newInviteToken returns a random opaque token and its SHA-256 hash. Only the
+// hash is stored; the raw token travels in the invite link.
+func newInviteToken() (raw, hash string, err error) {
+	b := make([]byte, 32)
+	if _, err = rand.Read(b); err != nil {
+		return "", "", err
+	}
+	raw = hex.EncodeToString(b)
+	return raw, hashToken(raw), nil
+}
+
+// hashToken returns the hex SHA-256 of an opaque token.
+func hashToken(raw string) string {
+	sum := sha256.Sum256([]byte(raw))
+	return hex.EncodeToString(sum[:])
+}
 
 func writeJSON(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json")

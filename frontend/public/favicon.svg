@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-labelledby="t">
+  <title id="t">Strata</title>
+  <rect width="128" height="128" rx="28" fill="#2563eb" />
+  <!-- stacked layers in light tints for contrast on the brand badge -->
+  <polygon fill="#93c5fd" points="56,78 92,92 56,106 20,92" />
+  <polygon fill="#dbeafe" points="64,52 100,66 64,80 28,66" />
+  <polygon fill="#ffffff" points="72,26 108,40 72,54 36,40" />
+</svg>

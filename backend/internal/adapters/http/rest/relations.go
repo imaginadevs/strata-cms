@@ -60,6 +60,7 @@ func (h *relationHandler) create(w http.ResponseWriter, r *http.Request) {
 		RelatedCollection string                        `json:"related_collection"`
 		FieldName         string                        `json:"field_name"`
 		DisplayName       string                        `json:"display_name"`
+		DisplayField      string                        `json:"display_field"`
 		Required          bool                          `json:"required"`
 		OnDelete          string                        `json:"on_delete"`
 		JunctionTable     string                        `json:"junction_table"`
@@ -109,7 +110,7 @@ func (h *relationHandler) create(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusInternalServerError, "could not add foreign key column: "+err.Error())
 			return
 		}
-		h.ensureFieldMeta(r.Context(), tenantID, actorID, collName, body.FieldName, body.DisplayName, body.Required, body.RelatedCollection)
+		h.ensureFieldMeta(r.Context(), tenantID, actorID, collName, body.FieldName, body.DisplayName, body.Required, body.RelatedCollection, body.DisplayField)
 
 	// One → One: FK on current collection, unique
 	case collectiondomain.RelationOneToOne:
@@ -127,7 +128,7 @@ func (h *relationHandler) create(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusInternalServerError, "could not add foreign key column: "+err.Error())
 			return
 		}
-		h.ensureFieldMeta(r.Context(), tenantID, actorID, collName, body.FieldName, body.DisplayName, body.Required, body.RelatedCollection)
+		h.ensureFieldMeta(r.Context(), tenantID, actorID, collName, body.FieldName, body.DisplayName, body.Required, body.RelatedCollection, body.DisplayField)
 
 	// One → Many: FK on the RELATED collection
 	case collectiondomain.RelationOneToMany:
@@ -146,7 +147,7 @@ func (h *relationHandler) create(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		// For one_to_many the FK column is on the related collection and references the current one
-		h.ensureFieldMeta(r.Context(), tenantID, actorID, body.RelatedCollection, body.FieldName, body.DisplayName, body.Required, collName)
+		h.ensureFieldMeta(r.Context(), tenantID, actorID, body.RelatedCollection, body.FieldName, body.DisplayName, body.Required, collName, body.DisplayField)
 
 	// Many ↔ Many: dedicated junction table
 	case collectiondomain.RelationManyToMany:
@@ -246,6 +247,7 @@ func (h *relationHandler) ensureFieldMeta(
 	collName, fieldName, displayName string,
 	required bool,
 	relatedCollection string,
+	displayField string,
 ) {
 	if displayName == "" {
 		displayName = strings.Title( //nolint:staticcheck
@@ -257,16 +259,22 @@ func (h *relationHandler) ensureFieldMeta(
 		h.log.Warnw("ensureFieldMeta: general section missing", "err", err, "collection", collName)
 		return
 	}
+	// options.display_field tells the admin UI which column of the related
+	// collection to render as the human-readable label instead of the raw UUID.
+	opts := map[string]any{"related_collection": relatedCollection}
+	if displayField != "" {
+		opts["display_field"] = displayField
+	}
 	f := &collectiondomain.Field{
-		Base:         domain.NewBase(tenantID, &actorID),
-		SectionID:    sec.ID,
-		SectionName:  sec.Name,
-		Name:         fieldName,
-		DisplayName:  displayName,
-		Type:         collectiondomain.FieldTypeRelation,
-		DBType:       "uuid",
-		Required:     required,
-		Options:      map[string]any{"related_collection": relatedCollection},
+		Base:        domain.NewBase(tenantID, &actorID),
+		SectionID:   sec.ID,
+		SectionName: sec.Name,
+		Name:        fieldName,
+		DisplayName: displayName,
+		Type:        collectiondomain.FieldTypeRelation,
+		DBType:      "uuid",
+		Required:    required,
+		Options:     opts,
 	}
 	if err := h.repos.Field.Create(ctx, tenantID, f); err != nil {
 		h.log.Warnw("ensureFieldMeta: create field metadata failed", "err", err, "field", fieldName)

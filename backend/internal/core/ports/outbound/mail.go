@@ -12,7 +12,8 @@ type Message struct {
 	To          []string
 	Cc          []string
 	Subject     string
-	Body        string
+	Body        string // plain-text part (always sent as the fallback)
+	HTMLBody    string // optional HTML part; when set the email is multipart/alternative
 	Attachments []Attachment
 }
 

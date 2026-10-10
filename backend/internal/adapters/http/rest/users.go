@@ -3,6 +3,7 @@ package rest
 import (
 	"encoding/json"
 	"net/http"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -16,8 +17,11 @@ import (
 	"github.com/imaginacolombia/cms/internal/infrastructure/logger"
 )
 
-func MountUsers(r chi.Router, repos *postgresrepo.Repos, bus events.Bus, log *logger.Logger) {
-	h := &userHandler{repos: repos, bus: bus, log: log}
+// inviteTTL is how long an invitation link stays valid.
+const inviteTTL = 7 * 24 * time.Hour
+
+func MountUsers(r chi.Router, repos *postgresrepo.Repos, mailer outbound.Mailer, bus events.Bus, log *logger.Logger) {
+	h := &userHandler{repos: repos, mailer: mailer, bus: bus, log: log}
 	p := repos.Permission
 
 	r.Route("/users", func(r chi.Router) {
@@ -28,6 +32,7 @@ func MountUsers(r chi.Router, repos *postgresrepo.Repos, bus events.Bus, log *lo
 
 		r.With(httpMiddleware.RequirePermission(p, userdomain.VirtualUsers, userdomain.ActionRead)).Get("/", h.list)
 		r.With(httpMiddleware.RequirePermission(p, userdomain.VirtualUsers, userdomain.ActionCreate)).Post("/", h.create)
+		r.With(httpMiddleware.RequirePermission(p, userdomain.VirtualUsers, userdomain.ActionCreate)).Post("/invite", h.invite)
 		r.With(httpMiddleware.RequirePermission(p, userdomain.VirtualUsers, userdomain.ActionRead)).Get("/{id}", h.getByID)
 		// Self may PATCH own record without cms_users update; handler restricts fields.
 		r.With(httpMiddleware.RequireUsersMutate(p, userdomain.ActionUpdate)).Patch("/{id}", h.update)
@@ -39,9 +44,102 @@ func MountUsers(r chi.Router, repos *postgresrepo.Repos, bus events.Bus, log *lo
 }
 
 type userHandler struct {
-	repos *postgresrepo.Repos
-	bus   events.Bus
-	log   *logger.Logger
+	repos  *postgresrepo.Repos
+	mailer outbound.Mailer // nil when SMTP is not configured
+	bus    events.Bus
+	log    *logger.Logger
+}
+
+// invite creates a pending (inactive) user, assigns any roles, stores a hashed
+// invite token, and emails the recipient an accept link. The link is always
+// returned so an admin can share it manually when SMTP is not configured.
+func (h *userHandler) invite(w http.ResponseWriter, r *http.Request) {
+	tenantID, _ := httpMiddleware.TenantIDFromCtx(r.Context())
+	actorID, _ := httpMiddleware.UserIDFromCtx(r.Context())
+
+	var body struct {
+		Email     string   `json:"email"`
+		FirstName string   `json:"first_name"`
+		LastName  string   `json:"last_name"`
+		RoleIDs   []string `json:"role_ids"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid body")
+		return
+	}
+	if body.Email == "" {
+		writeError(w, http.StatusBadRequest, "email is required")
+		return
+	}
+	if existing, _ := h.repos.User.GetByEmail(r.Context(), tenantID, body.Email); existing != nil {
+		writeError(w, http.StatusConflict, "a user with this email already exists")
+		return
+	}
+
+	u := userdomain.New(tenantID, body.Email, body.FirstName, body.LastName, userdomain.ProviderLocal)
+	u.Status = userdomain.StatusInactive // pending until the invite is accepted
+	u.CreatedBy = &actorID
+	u.UpdatedBy = &actorID
+	if err := h.repos.User.Create(r.Context(), tenantID, u); err != nil {
+		h.log.Errorw("invite: user create failed", "err", err)
+		writeError(w, http.StatusInternalServerError, "could not create user")
+		return
+	}
+
+	for _, rid := range body.RoleIDs {
+		if roleID, err := uuid.Parse(rid); err == nil {
+			if err := h.repos.Role.AssignToUser(r.Context(), tenantID, u.ID, roleID); err != nil {
+				h.log.Warnw("invite: role assign failed", "err", err, "role", rid)
+			}
+		}
+	}
+
+	raw, hash, err := newInviteToken()
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "could not generate invite")
+		return
+	}
+	if err := h.repos.User.SetInvite(r.Context(), tenantID, u.ID, hash, time.Now().Add(inviteTTL)); err != nil {
+		writeError(w, http.StatusInternalServerError, "could not store invite")
+		return
+	}
+
+	link := inviteLink(r, raw)
+	emailSent := false
+	if h.mailer != nil {
+		tenantName := "the workspace"
+		if t, ok := httpMiddleware.TenantFromCtx(r.Context()); ok && t != nil {
+			tenantName = t.Name
+		}
+		msg := outbound.Message{
+			To:      []string{body.Email},
+			Subject: "You've been invited to " + tenantName,
+			Body: "You've been invited to join " + tenantName + ".\n\n" +
+				"Set your password to activate your account:\n" + link + "\n\n" +
+				"This link expires in 7 days.",
+		}
+		if err := h.mailer.Send(r.Context(), msg); err != nil {
+			h.log.Warnw("invite: email send failed", "err", err, "email", body.Email)
+		} else {
+			emailSent = true
+		}
+	}
+
+	u.PasswordHash = nil
+	writeJSON(w, http.StatusCreated, map[string]any{
+		"user":        u,
+		"invite_link": link,
+		"email_sent":  emailSent,
+	})
+}
+
+// inviteLink builds the public accept-invite URL from the request's scheme + host.
+func inviteLink(r *http.Request, rawToken string) string {
+	scheme := "http"
+	if r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https" {
+		scheme = "https"
+	}
+	return scheme + "://" + r.Host + "/accept-invite?token=" + rawToken
 }
 
 func (h *userHandler) list(w http.ResponseWriter, r *http.Request) {
@@ -282,7 +380,6 @@ func (h *userHandler) revokeRole(w http.ResponseWriter, r *http.Request) {
 	}
 	w.WriteHeader(http.StatusNoContent)
 }
-
 
 // ─── Self profile (/users/me) ─────────────────────────────────────────────────
 

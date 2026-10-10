@@ -392,4 +392,96 @@ ALTER TABLE {schema}.sessions
 CREATE UNIQUE INDEX IF NOT EXISTS roles_name_uidx ON {schema}.roles (name);
 `,
 	},
+	{
+		version: 9,
+		sql: `
+-- File storage metadata: public flag (CDN vs presigned serving) + owning collection.
+ALTER TABLE {schema}.files
+    ADD COLUMN IF NOT EXISTS is_public  BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE {schema}.files
+    ADD COLUMN IF NOT EXISTS collection TEXT;
+CREATE INDEX IF NOT EXISTS files_collection_idx ON {schema}.files (collection, created_at);
+`,
+	},
+	{
+		version: 10,
+		sql: `
+-- Collection groups (sidebar folders) + per-collection group membership & order.
+CREATE TABLE IF NOT EXISTS {schema}.collection_groups (
+    id         UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+    name       TEXT        NOT NULL,
+    icon       TEXT,
+    color      TEXT,
+    sort       INT         NOT NULL DEFAULT 0,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    created_by UUID,
+    updated_by UUID
+);
+ALTER TABLE {schema}.collections
+    ADD COLUMN IF NOT EXISTS group_id UUID REFERENCES {schema}.collection_groups(id) ON DELETE SET NULL;
+ALTER TABLE {schema}.collections
+    ADD COLUMN IF NOT EXISTS sort INT NOT NULL DEFAULT 0;
+CREATE INDEX IF NOT EXISTS collections_group_idx ON {schema}.collections (group_id, sort);
+`,
+	},
+	{
+		version: 11,
+		sql: `
+-- Programmatic API tokens (policy-scoped). Only the SHA-256 hash is stored.
+CREATE TABLE IF NOT EXISTS {schema}.api_tokens (
+    id                    UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+    name                  TEXT        NOT NULL,
+    secret_prefix         TEXT        NOT NULL,
+    secret_hash           TEXT        NOT NULL,
+    old_secret_hash       TEXT,
+    old_secret_expires_at TIMESTAMPTZ,
+    policies              JSONB       NOT NULL DEFAULT '[]',
+    lifetime              VARCHAR(16) NOT NULL DEFAULT 'forever',
+    rotate_at             TIMESTAMPTZ,
+    last_notified_at      TIMESTAMPTZ,
+    revoked               BOOLEAN     NOT NULL DEFAULT FALSE,
+    last_used_at          TIMESTAMPTZ,
+    created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    created_by            UUID,
+    updated_by            UUID,
+    UNIQUE (secret_prefix)
+);
+CREATE INDEX IF NOT EXISTS api_tokens_rotate_idx ON {schema}.api_tokens (rotate_at) WHERE revoked = FALSE;
+`,
+	},
+	{
+		version: 12,
+		sql: `
+-- User invitations: a pending user carries an invite token hash until they accept.
+ALTER TABLE {schema}.users ADD COLUMN IF NOT EXISTS invite_token_hash TEXT;
+ALTER TABLE {schema}.users ADD COLUMN IF NOT EXISTS invite_expires_at TIMESTAMPTZ;
+CREATE INDEX IF NOT EXISTS users_invite_token_idx ON {schema}.users (invite_token_hash);
+`,
+	},
+	{
+		version: 13,
+		sql: `
+-- Per-tenant email template overrides (optional; built-in defaults used otherwise).
+CREATE TABLE IF NOT EXISTS {schema}.email_templates (
+    template_key TEXT        PRIMARY KEY,
+    subject      TEXT        NOT NULL DEFAULT '',
+    html         TEXT        NOT NULL DEFAULT '',
+    text         TEXT        NOT NULL DEFAULT '',
+    enabled      BOOLEAN     NOT NULL DEFAULT TRUE,
+    updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_by   UUID
+);
+`,
+	},
+	{
+		version: 14,
+		sql: `
+-- Workflows provisioned by a plugin are tagged so install is idempotent and
+-- uninstall can remove them.
+ALTER TABLE {schema}.workflows ADD COLUMN IF NOT EXISTS origin_plugin TEXT;
+CREATE INDEX IF NOT EXISTS workflows_origin_idx ON {schema}.workflows (origin_plugin);
+`,
+	},
 }

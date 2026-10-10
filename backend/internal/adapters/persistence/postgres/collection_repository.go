@@ -21,7 +21,7 @@ type collectionRepository struct {
 
 const collectionCols = `
     id, name, display_name, type, icon, color, note,
-    is_system, is_hidden, is_singleton, sort_field, meta,
+    is_system, is_hidden, is_singleton, sort_field, meta, group_id, sort,
     created_at, updated_at, created_by, updated_by`
 
 func (r *collectionRepository) Create(ctx context.Context, tenantID uuid.UUID, c *collectiondomain.Collection) error {
@@ -30,12 +30,12 @@ func (r *collectionRepository) Create(ctx context.Context, tenantID uuid.UUID, c
 	_, err := r.db.Exec(ctx, fmt.Sprintf(`
 		INSERT INTO %s.collections
 		    (id, name, display_name, type, icon, color, note,
-		     is_system, is_hidden, is_singleton, sort_field, meta,
+		     is_system, is_hidden, is_singleton, sort_field, meta, group_id, sort,
 		     created_by, updated_by)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`, s),
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)`, s),
 		c.ID, c.Name, c.DisplayName, c.Type,
 		c.Icon, c.Color, c.Note,
-		c.IsSystem, c.IsHidden, c.IsSingleton, c.SortField, metaJSON,
+		c.IsSystem, c.IsHidden, c.IsSingleton, c.SortField, metaJSON, c.GroupID, c.Sort,
 		c.CreatedBy, c.UpdatedBy,
 	)
 	return err
@@ -70,13 +70,32 @@ func (r *collectionRepository) Update(ctx context.Context, tenantID uuid.UUID, c
 		UPDATE %s.collections
 		SET display_name=$1, icon=$2, color=$3, note=$4,
 		    is_hidden=$5, is_singleton=$6, sort_field=$7, meta=$8,
-		    updated_by=$9, updated_at=NOW()
-		WHERE id=$10`, s),
+		    group_id=$9, sort=$10, updated_by=$11, updated_at=NOW()
+		WHERE id=$12`, s),
 		c.DisplayName, c.Icon, c.Color, c.Note,
 		c.IsHidden, c.IsSingleton, c.SortField, metaJSON,
-		c.UpdatedBy, c.ID,
+		c.GroupID, c.Sort, c.UpdatedBy, c.ID,
 	)
 	return err
+}
+
+// ReorderCollections applies group membership + sort position to many collections
+// in one transaction (used by sidebar/overview drag-and-drop).
+func (r *collectionRepository) ReorderCollections(ctx context.Context, tenantID uuid.UUID, items []collectiondomain.CollectionPlacement) error {
+	s := schemaOf(tenantID)
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx) //nolint:errcheck
+	for _, it := range items {
+		if _, err := tx.Exec(ctx, fmt.Sprintf(
+			`UPDATE %s.collections SET group_id=$1, sort=$2, updated_at=NOW() WHERE id=$3`, s),
+			it.GroupID, it.Sort, it.ID); err != nil {
+			return err
+		}
+	}
+	return tx.Commit(ctx)
 }
 
 func (r *collectionRepository) Delete(ctx context.Context, tenantID uuid.UUID, name string) error {
@@ -102,7 +121,7 @@ func (r *collectionRepository) List(ctx context.Context, tenantID uuid.UUID, inc
 	if !includeHidden {
 		q += " WHERE is_hidden = FALSE"
 	}
-	q += " ORDER BY name"
+	q += " ORDER BY sort, name"
 
 	rows, err := r.db.Query(ctx, q)
 	if err != nil {
@@ -244,7 +263,7 @@ func scanCollectionRow(row rowScanner) (*collectiondomain.Collection, error) {
 	err := row.Scan(
 		&c.ID, &c.Name, &c.DisplayName, &c.Type,
 		&c.Icon, &c.Color, &c.Note,
-		&c.IsSystem, &c.IsHidden, &c.IsSingleton, &c.SortField, &metaRaw,
+		&c.IsSystem, &c.IsHidden, &c.IsSingleton, &c.SortField, &metaRaw, &c.GroupID, &c.Sort,
 		&c.CreatedAt, &c.UpdatedAt, &c.CreatedBy, &c.UpdatedBy,
 	)
 	if err != nil {
@@ -292,4 +311,3 @@ func (r *collectionRepository) RenameCollection(ctx context.Context, tenantID uu
 	}
 	return tx.Commit(ctx)
 }
-

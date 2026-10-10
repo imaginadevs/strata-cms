@@ -15,8 +15,10 @@ import { useTenantStore } from "@/store/tenant.store";
 import type {
   Plugin,
   PluginInstallResponse,
+  SettingsResponse,
   Tenant,
   TenantSettings,
+  TenantStorageSettings,
 } from "@/types";
 
 // ── Language catalogue ────────────────────────────────────────────────────────
@@ -489,40 +491,7 @@ export default function SettingsPage() {
       />
 
       {/* S3 storage */}
-      <Card>
-        <CardHeader>
-          <CardTitle>File Storage (S3)</CardTitle>
-        </CardHeader>
-        <div className="space-y-4">
-          <p className="text-xs text-slate-500 dark:text-slate-400">
-            Each tenant can connect its own S3-compatible bucket (AWS, MinIO,
-            Cloudflare R2, etc.)
-          </p>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="mb-1.5 block text-xs font-medium text-slate-600 dark:text-slate-300">Endpoint</label>
-              <input placeholder="https://s3.amazonaws.com" className="input text-xs" />
-            </div>
-            <div>
-              <label className="mb-1.5 block text-xs font-medium text-slate-600 dark:text-slate-300">Region</label>
-              <input placeholder="us-east-1" className="input text-xs" />
-            </div>
-            <div>
-              <label className="mb-1.5 block text-xs font-medium text-slate-600 dark:text-slate-300">Bucket</label>
-              <input placeholder="my-tenant-bucket" className="input text-xs" />
-            </div>
-            <div>
-              <label className="mb-1.5 block text-xs font-medium text-slate-600 dark:text-slate-300">Access Key ID</label>
-              <input type="password" placeholder="AKIA…" className="input text-xs" />
-            </div>
-            <div className="col-span-2">
-              <label className="mb-1.5 block text-xs font-medium text-slate-600 dark:text-slate-300">Secret Access Key</label>
-              <input type="password" className="input text-xs" />
-            </div>
-          </div>
-          <Button>Save storage config</Button>
-        </div>
-      </Card>
+      <StorageSettingsCard />
 
       {/* SSO */}
       <Card>
@@ -551,5 +520,152 @@ export default function SettingsPage() {
         </div>
       </Card>
     </div>
+  );
+}
+
+// ── Storage (S3) settings card ──────────────────────────────────────────────────
+
+const emptyStorage: TenantStorageSettings = {
+  inherit: true,
+  endpoint: "",
+  region: "us-east-1",
+  bucket: "",
+  access_key_id: "",
+  secret_key: "",
+  public_base_url: "",
+  cdn_base_url: "",
+  force_path_style: false,
+};
+
+function StorageSettingsCard() {
+  const queryClient = useQueryClient();
+  const { data } = useQuery({
+    queryKey: ["settings"],
+    queryFn: () => get<SettingsResponse>("/settings"),
+  });
+
+  const [form, setForm] = useState<TenantStorageSettings>(emptyStorage);
+  const [saved, setSaved] = useState(false);
+  const [seeded, setSeeded] = useState(false);
+
+  useEffect(() => {
+    if (data && !seeded) {
+      setForm({ ...emptyStorage, ...(data.settings.storage ?? {}), secret_key: "" });
+      setSeeded(true);
+    }
+  }, [data, seeded]);
+
+  const env = data?.storage_env;
+  const secretSet = data?.storage_secret_set ?? false;
+  const set = (patchForm: Partial<TenantStorageSettings>) => setForm((f) => ({ ...f, ...patchForm }));
+
+  const saveMut = useMutation({
+    mutationFn: () =>
+      patch<Tenant>("/settings", {
+        settings: { ...data?.settings, storage: form },
+      }),
+    onSuccess: () => {
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+      setSeeded(false);
+      queryClient.invalidateQueries({ queryKey: ["settings"] });
+    },
+  });
+
+  const inputCls = "input text-xs";
+  const labelCls = "mb-1.5 block text-xs font-medium text-slate-600 dark:text-slate-300";
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>File Storage (S3)</CardTitle>
+      </CardHeader>
+      <div className="space-y-4">
+        {/* Inherit default (env) credentials */}
+        <label
+          className={`flex items-start gap-3 rounded-xl border px-4 py-3 ${
+            env?.configured
+              ? "cursor-pointer border-slate-100 bg-slate-50 dark:border-white/10 dark:bg-white/5"
+              : "border-slate-100 bg-slate-50 opacity-60 dark:border-white/10 dark:bg-white/5"
+          }`}
+        >
+          <input
+            type="checkbox"
+            checked={form.inherit}
+            disabled={!env?.configured}
+            onChange={(e) => set({ inherit: e.target.checked })}
+            className="mt-0.5 h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-400 dark:border-white/10"
+          />
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-slate-800 dark:text-slate-100">
+              Inherit the default credentials
+            </p>
+            {env?.configured ? (
+              <p className="text-xs text-slate-400">
+                Use the server's default S3 (<span className="font-mono">{env.bucket}</span>). Files are
+                stored under <span className="font-mono">tenants/&#123;tenant_id&#125;/…</span>.
+              </p>
+            ) : (
+              <p className="text-xs text-slate-400">
+                No default S3 is configured on the server — enter this tenant's own credentials below.
+              </p>
+            )}
+          </div>
+        </label>
+
+        {/* Own credentials — hidden while inheriting */}
+        {!form.inherit && (
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className={labelCls}>Endpoint</label>
+              <input className={inputCls} placeholder="https://s3.wasabisys.com"
+                value={form.endpoint} onChange={(e) => set({ endpoint: e.target.value })} />
+            </div>
+            <div>
+              <label className={labelCls}>Region</label>
+              <input className={inputCls} placeholder="us-east-1"
+                value={form.region} onChange={(e) => set({ region: e.target.value })} />
+            </div>
+            <div>
+              <label className={labelCls}>Bucket</label>
+              <input className={inputCls} placeholder="my-tenant-bucket"
+                value={form.bucket} onChange={(e) => set({ bucket: e.target.value })} />
+            </div>
+            <div>
+              <label className={labelCls}>Access Key ID</label>
+              <input className={inputCls} placeholder="AKIA…"
+                value={form.access_key_id} onChange={(e) => set({ access_key_id: e.target.value })} />
+            </div>
+            <div className="col-span-2">
+              <label className={labelCls}>Secret Access Key</label>
+              <input className={inputCls} type="password"
+                placeholder={secretSet ? "•••••••• (unchanged)" : ""}
+                value={form.secret_key ?? ""} onChange={(e) => set({ secret_key: e.target.value })} />
+            </div>
+            <div>
+              <label className={labelCls}>Public base URL (optional)</label>
+              <input className={inputCls} placeholder="https://cdn.example.com"
+                value={form.public_base_url} onChange={(e) => set({ public_base_url: e.target.value })} />
+            </div>
+            <div>
+              <label className={labelCls}>CDN base URL (optional)</label>
+              <input className={inputCls} placeholder="https://images.example.com"
+                value={form.cdn_base_url} onChange={(e) => set({ cdn_base_url: e.target.value })} />
+            </div>
+            <label className="col-span-2 flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
+              <input type="checkbox" checked={form.force_path_style}
+                onChange={(e) => set({ force_path_style: e.target.checked })}
+                className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-400 dark:border-white/10" />
+              Force path-style addressing (required for MinIO)
+            </label>
+          </div>
+        )}
+
+        <div className="flex items-center gap-3">
+          <Button onClick={() => saveMut.mutate()} loading={saveMut.isPending}>Save storage config</Button>
+          {saved && <span className="text-xs text-emerald-600 dark:text-emerald-300">Saved</span>}
+        </div>
+      </div>
+    </Card>
   );
 }

@@ -53,9 +53,42 @@ func (e *Engine) Start(bus events.Bus) {
 		e.onItemUpdate(ctx, ev)
 		return nil
 	})
+	subCreate := bus.Subscribe(events.EventAfterCreate, func(ctx context.Context, ev events.Event) error {
+		e.onItemCreate(ctx, ev)
+		return nil
+	})
 	e.mu.Lock()
-	e.subs = append(e.subs, sub)
+	e.subs = append(e.subs, sub, subCreate)
 	e.mu.Unlock()
+}
+
+// onItemCreate dispatches entity_created workflows for a newly created item.
+func (e *Engine) onItemCreate(ctx context.Context, ev events.Event) {
+	list, err := e.repo.ListActiveByTrigger(ctx, ev.TenantID, wfdomain.TriggerEntityCreated)
+	if err != nil {
+		e.log.Errorw("workflow list (entity_created) failed", "err", err)
+		return
+	}
+	matcher, ok := e.registry.Trigger(wfdomain.TriggerEntityCreated)
+	if !ok {
+		return
+	}
+	itemID := ""
+	if ev.ItemID != nil {
+		itemID = *ev.ItemID
+	}
+	for _, wf := range list {
+		match, err := matcher.Match(wf.Trigger.Config, ev)
+		if err != nil {
+			e.log.Warnw("workflow match error", "workflow_id", wf.ID, "err", err)
+			continue
+		}
+		if !match {
+			continue
+		}
+		runCtx := map[string]any{"item": ev.Payload}
+		e.enqueueRun(ctx, ev.TenantID, wf, itemID, ev.Collection, ev.Payload, nil, nil, ev.UserID, runCtx)
+	}
 }
 
 func (e *Engine) Stop(bus events.Bus) {
