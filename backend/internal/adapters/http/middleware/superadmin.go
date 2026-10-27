@@ -51,6 +51,13 @@ func IsSuperAdmin(ctx context.Context) bool {
 	return v
 }
 
+// ClientIP returns the best-effort source IP of the request, using the same
+// resolution the super-admin IP gate uses. Exposed so handlers can report the
+// caller's IP (e.g. in the super-admin status endpoint).
+func ClientIP(r *http.Request) string {
+	return extractIP(r)
+}
+
 // isSuperAdminClaim reports whether the authenticated principal is a super admin.
 // The authoritative source is the token's `sa` claim (set from users.is_super_admin
 // and injected as CtxKeyIsSuperAdmin by Authenticate). A legacy "super_admin" role

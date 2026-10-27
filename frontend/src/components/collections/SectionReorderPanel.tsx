@@ -4,6 +4,7 @@
  * Used from content create/edit and the collection editor.
  */
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { createPortal } from "react-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { AnimatePresence, motion } from "framer-motion";
@@ -62,6 +63,7 @@ function SectionReorderPanelInner({
   sections: Section[];
   onClose: () => void;
 }) {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [order, setOrder] = useState(() =>
     [...sections].sort((a, b) => a.sort - b.sort),
@@ -143,10 +145,10 @@ function SectionReorderPanelInner({
         <div className="flex shrink-0 items-center justify-between border-b border-slate-100 dark:border-white/10 px-6 py-5">
           <div>
             <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">
-              Sort sections
+              {t("collections.sortSections")}
             </h2>
             <p className="mt-0.5 text-xs text-slate-400">
-              Drag to reorder — fields stay inside each section
+              {t("collections.sortSectionsHint")}
             </p>
           </div>
           <button
@@ -160,7 +162,7 @@ function SectionReorderPanelInner({
 
         <div className="flex-1 overflow-y-auto px-4 py-4">
           {order.length === 0 ? (
-            <p className="py-8 text-center text-sm text-slate-400">No sections to sort</p>
+            <p className="py-8 text-center text-sm text-slate-400">{t("collections.noSectionsToSort")}</p>
           ) : (
             <DndContext
               sensors={sensors}
@@ -193,14 +195,14 @@ function SectionReorderPanelInner({
 
         <div className="flex shrink-0 items-center justify-between border-t border-slate-100 dark:border-white/10 px-6 py-4">
           <Button type="button" variant="ghost" onClick={onClose}>
-            Cancel
+            {t("common.cancel")}
           </Button>
           <Button
             type="button"
             onClick={handleSave}
             disabled={mutation.isPending || order.length < 2}
           >
-            {mutation.isPending ? "Saving…" : "Save order"}
+            {mutation.isPending ? t("common.saving") : t("collections.saveOrder")}
           </Button>
         </div>
       </motion.aside>
@@ -215,6 +217,7 @@ function SortableSectionRow({
   section: Section;
   index: number;
 }) {
+  const { t } = useTranslation();
   const {
     attributes,
     listeners,
@@ -246,7 +249,7 @@ function SortableSectionRow({
         className="flex h-8 w-8 shrink-0 cursor-grab items-center justify-center rounded-lg text-slate-300 hover:bg-white hover:text-slate-500 active:cursor-grabbing dark:hover:bg-white/10"
         {...attributes}
         {...listeners}
-        title="Drag to reorder"
+        title={t("collections.dragToReorder")}
       >
         <GripVertical size={16} />
       </button>
@@ -259,7 +262,7 @@ function SortableSectionRow({
         </p>
         <p className="truncate font-mono text-[11px] text-slate-400">
           {section.name}
-          {fieldCount > 0 ? ` · ${fieldCount} field${fieldCount !== 1 ? "s" : ""}` : ""}
+          {fieldCount > 0 ? ` · ${t("collections.fieldCount", { count: fieldCount })}` : ""}
         </p>
       </div>
     </li>

@@ -2,6 +2,7 @@ import { Search, LogOut, User, ChevronDown, Sun, Moon, Menu } from "lucide-react
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { motion, useReducedMotion } from "framer-motion";
 import { useNavigate } from "@tanstack/react-router";
+import { useTranslation } from "react-i18next";
 import { useAuthStore } from "@/store/auth.store";
 import { useThemeStore } from "@/store/theme.store";
 import { useUIStore } from "@/store/ui.store";
@@ -11,6 +12,7 @@ import { spring } from "@/lib/motion";
 import { NotificationsBell } from "./NotificationsBell";
 
 function ThemeToggle() {
+  const { t } = useTranslation();
   const { theme, toggle } = useThemeStore();
   const reduce = useReducedMotion();
   const isDark = theme === "dark";
@@ -18,7 +20,7 @@ function ThemeToggle() {
   return (
     <button
       onClick={toggle}
-      aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
+      aria-label={t("shell.toggleTheme")}
       className="relative flex h-9 w-9 items-center justify-center rounded-xl
                  text-slate-500 transition hover:bg-slate-100
                  dark:text-slate-300 dark:hover:bg-white/10"
@@ -37,6 +39,7 @@ function ThemeToggle() {
 }
 
 export function Header() {
+  const { t } = useTranslation();
   const { user, clearSession } = useAuthStore();
   const { toggleSidebar } = useUIStore();
   const navigate = useNavigate();
@@ -59,7 +62,7 @@ export function Header() {
       {/* Hamburger — opens the sidebar drawer below lg */}
       <button
         onClick={toggleSidebar}
-        aria-label="Open navigation menu"
+        aria-label={t("shell.openMenu")}
         className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl
                    text-slate-500 transition hover:bg-slate-100
                    dark:text-slate-300 dark:hover:bg-white/10 lg:hidden"
@@ -72,7 +75,7 @@ export function Header() {
         <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
         <input
           type="search"
-          placeholder="Search…"
+          placeholder={t("shell.searchPlaceholder")}
           className="h-9 w-full rounded-xl border border-slate-200 bg-slate-50/70
                      pl-9 pr-4 text-sm text-slate-700 placeholder:text-slate-400
                      focus:border-brand-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-100
@@ -99,7 +102,7 @@ export function Header() {
                 {user ? initials(`${user.first_name} ${user.last_name}`) : "?"}
               </div>
               <span className="font-medium text-slate-700 dark:text-slate-200">
-                {user?.first_name ?? "Account"}
+                {user?.first_name ?? t("shell.admin")}
               </span>
               <ChevronDown size={13} className="text-slate-400" />
             </button>
@@ -120,7 +123,7 @@ export function Header() {
                            dark:text-slate-200 dark:hover:bg-white/10"
               >
                 <User size={15} />
-                My Profile
+                {t("shell.myProfile")}
               </DropdownMenu.Item>
               <DropdownMenu.Separator className="my-1 h-px bg-slate-100 dark:bg-white/10" />
               <DropdownMenu.Item
@@ -130,7 +133,7 @@ export function Header() {
                            dark:text-red-400 dark:hover:bg-red-500/10"
               >
                 <LogOut size={15} />
-                Sign out
+                {t("shell.signOut")}
               </DropdownMenu.Item>
             </DropdownMenu.Content>
           </DropdownMenu.Portal>

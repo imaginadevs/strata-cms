@@ -12,6 +12,7 @@
  */
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   DndContext,
@@ -34,7 +35,7 @@ import { GripVertical, Plus, Trash2, ChevronDown } from "lucide-react";
 import { get } from "@/lib/api";
 import { FieldGroup } from "@/components/content/fields";
 import { allFields } from "@/lib/collection";
-import type { ChildRelation } from "@/lib/relational";
+import { listRelations, withRelationOptions, type ChildRelation } from "@/lib/relational";
 import type { Collection, Field } from "@/types";
 
 const SORT_FIELD = "sort";
@@ -52,17 +53,28 @@ export function SubitemsEditor({
   initialRows: Record<string, unknown>[];
   onChange: (rows: Record<string, unknown>[]) => void;
 }) {
+  const { t } = useTranslation();
   const { data: schema, isLoading } = useQuery({
     queryKey: ["collection", child.childCollection],
     queryFn: () => get<Collection>(`/collections/${child.childCollection}`),
   });
 
+  // The child's own relations turn its FK columns (e.g. block_id) into pickers.
+  const { data: relations } = useQuery({
+    queryKey: ["relations", child.childCollection],
+    queryFn: () => listRelations(child.childCollection),
+  });
+
   const fields = allFields(schema);
   const hasSort = fields.some((f) => f.name === SORT_FIELD);
   // Editable fields: skip system columns, the FK (set by the server) and the
-  // managed sort column.
-  const editableFields: Field[] = fields.filter(
-    (f) => !f.is_system && f.name !== child.fkColumn && f.name !== SORT_FIELD,
+  // managed sort column. Inject related_collection so UUID FKs render as pickers.
+  const editableFields: Field[] = withRelationOptions(
+    fields.filter(
+      (f) => !f.is_system && f.name !== child.fkColumn && f.name !== SORT_FIELD,
+    ),
+    relations ?? [],
+    child.childCollection,
   );
 
   const [rows, setRows] = useState<Row[]>(() =>
@@ -128,8 +140,8 @@ export function SubitemsEditor({
             {schema?.display_name ?? child.childCollection}
           </p>
           <p className="text-[11px] text-slate-400">
-            {rows.length} item{rows.length !== 1 ? "s" : ""}
-            {child.owned ? "" : " · linked"}
+            {t("content.itemCount", { count: rows.length })}
+            {child.owned ? "" : t("content.linkedSuffix")}
           </p>
         </div>
         <button
@@ -139,7 +151,7 @@ export function SubitemsEditor({
           className="flex items-center gap-1 rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-2.5 py-1.5 text-xs font-medium text-slate-600 dark:text-slate-300 transition hover:bg-brand-50 dark:hover:bg-brand-500/15 hover:text-brand-700 dark:hover:text-brand-300 disabled:opacity-50"
         >
           <Plus size={13} />
-          Add
+          {t("common.add")}
         </button>
       </div>
 
@@ -148,7 +160,7 @@ export function SubitemsEditor({
           <div className="h-9 animate-pulse rounded-lg bg-slate-100 dark:bg-white/5" />
         </div>
       ) : rows.length === 0 ? (
-        <p className="px-4 pb-4 text-xs text-slate-400">No items yet.</p>
+        <p className="px-4 pb-4 text-xs text-slate-400">{t("content.noItems")}</p>
       ) : (
         <div className="space-y-2 px-3 pb-3">
           <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
@@ -193,6 +205,7 @@ function SortableRow({
   onRemove: () => void;
   children: React.ReactNode;
 }) {
+  const { t } = useTranslation();
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id });
 
@@ -214,7 +227,7 @@ function SortableRow({
         <button
           type="button"
           className="flex h-7 w-7 shrink-0 cursor-grab items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5 active:cursor-grabbing"
-          aria-label="Drag to reorder"
+          aria-label={t("content.dragToReorder")}
           {...attributes}
           {...listeners}
         >
@@ -237,7 +250,7 @@ function SortableRow({
           type="button"
           onClick={onRemove}
           className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-slate-400 transition hover:bg-red-50 dark:hover:bg-red-500/10 hover:text-red-600 dark:hover:text-red-400"
-          aria-label="Remove"
+          aria-label={t("common.remove")}
         >
           <Trash2 size={13} />
         </button>

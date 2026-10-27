@@ -18,7 +18,7 @@ type tenantRepository struct{ db *pgxpool.Pool }
 
 const tenantCols = `
     id, name, slug, default_language, logo, primary_color, domain,
-    active, settings, storage_used_bytes, storage_quota_bytes,
+    active, is_platform, settings, storage_used_bytes, storage_quota_bytes,
     created_at, updated_at`
 
 func (r *tenantRepository) Create(ctx context.Context, t *tenantdomain.Tenant) error {
@@ -26,10 +26,10 @@ func (r *tenantRepository) Create(ctx context.Context, t *tenantdomain.Tenant) e
 
 	_, err := r.db.Exec(ctx, `
 		INSERT INTO tenants
-		    (id, name, slug, default_language, logo, primary_color, domain, active, settings)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+		    (id, name, slug, default_language, logo, primary_color, domain, active, is_platform, settings)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
 		t.ID, t.Name, t.Slug, t.DefaultLanguage,
-		t.Logo, t.PrimaryColor, t.Domain, t.Active, b,
+		t.Logo, t.PrimaryColor, t.Domain, t.Active, t.IsPlatform, b,
 	)
 	if err != nil {
 		return fmt.Errorf("tenant create: insert: %w", err)
@@ -53,6 +53,31 @@ func (r *tenantRepository) GetBySlug(ctx context.Context, slug string) (*tenantd
 func (r *tenantRepository) GetByDomain(ctx context.Context, domain string) (*tenantdomain.Tenant, error) {
 	return scanOneTenant(r.db.QueryRow(ctx,
 		`SELECT`+tenantCols+` FROM tenants WHERE domain = $1 LIMIT 1`, domain))
+}
+
+// GetPlatform returns the single platform tenant, or nil if none is flagged.
+func (r *tenantRepository) GetPlatform(ctx context.Context) (*tenantdomain.Tenant, error) {
+	return scanOneTenant(r.db.QueryRow(ctx,
+		`SELECT`+tenantCols+` FROM tenants WHERE is_platform = TRUE LIMIT 1`))
+}
+
+// SetPlatform makes id the one-and-only platform tenant (clears any previous
+// flag first, in a transaction, so the single-platform unique index is upheld).
+func (r *tenantRepository) SetPlatform(ctx context.Context, id uuid.UUID) error {
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+	if _, err := tx.Exec(ctx,
+		`UPDATE tenants SET is_platform = FALSE WHERE is_platform = TRUE AND id <> $1`, id); err != nil {
+		return fmt.Errorf("clear platform flag: %w", err)
+	}
+	if _, err := tx.Exec(ctx,
+		`UPDATE tenants SET is_platform = TRUE WHERE id = $1`, id); err != nil {
+		return fmt.Errorf("set platform flag: %w", err)
+	}
+	return tx.Commit(ctx)
 }
 
 func (r *tenantRepository) Update(ctx context.Context, t *tenantdomain.Tenant) error {
@@ -144,7 +169,7 @@ func scanTenantRow(row rowScanner) (*tenantdomain.Tenant, error) {
 	var settingsRaw []byte
 	err := row.Scan(
 		&t.ID, &t.Name, &t.Slug, &t.DefaultLanguage,
-		&t.Logo, &t.PrimaryColor, &t.Domain, &t.Active,
+		&t.Logo, &t.PrimaryColor, &t.Domain, &t.Active, &t.IsPlatform,
 		&settingsRaw,
 		&t.StorageUsedBytes, &t.StorageQuotaBytes,
 		&t.CreatedAt, &t.UpdatedAt,

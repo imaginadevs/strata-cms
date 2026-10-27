@@ -36,7 +36,10 @@ type User struct {
 	ProviderUID  *string      `json:"provider_uid"    db:"provider_uid"`
 	PasswordHash *string      `json:"-"               db:"password_hash"`
 	LastLogin    *time.Time   `json:"last_login"      db:"last_login"`
+	// Language is the user's preferred CONTENT language (which translation of
+	// content they author/view). UILanguage is the admin INTERFACE language.
 	Language     string       `json:"language"        db:"language"`
+	UILanguage   string       `json:"ui_language"     db:"ui_language"`
 	IsSuperAdmin bool         `json:"is_super_admin"  db:"is_super_admin"`
 	Roles        []Role       `json:"roles,omitempty"`
 }

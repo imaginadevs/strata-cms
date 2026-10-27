@@ -6,6 +6,7 @@
  */
 import { useState } from "react";
 import { createPortal } from "react-dom";
+import { useTranslation } from "react-i18next";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AnimatePresence, motion } from "framer-motion";
 import * as Select from "@radix-ui/react-select";
@@ -17,11 +18,7 @@ import { LanguageSelector, useAvailableLanguages } from "@/components/content/fi
 import { initials, formatDate } from "@/lib/utils";
 import type { PaginatedResponse, Role, User, UserStatus } from "@/types";
 
-const STATUSES: { value: UserStatus; label: string }[] = [
-  { value: "active", label: "Active" },
-  { value: "inactive", label: "Inactive" },
-  { value: "suspended", label: "Suspended" },
-];
+const STATUS_VALUES: UserStatus[] = ["active", "inactive", "suspended"];
 
 type UpdateUserBody = {
   first_name: string;
@@ -30,7 +27,14 @@ type UpdateUserBody = {
   language: string;
 };
 
+function statusLabel(t: (k: string) => string, s: UserStatus): string {
+  if (s === "active") return t("common.active");
+  if (s === "inactive") return t("users.statusInactive");
+  return t("users.statusSuspended");
+}
+
 export default function UsersPage() {
+  const { t } = useTranslation();
   const [editing, setEditing] = useState<User | null>(null);
   const [inviting, setInviting] = useState(false);
   const { data, isLoading } = useQuery({
@@ -42,14 +46,14 @@ export default function UsersPage() {
     <div className="space-y-5">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Users</h1>
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">{t("users.title")}</h1>
           <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-            {data?.total ?? 0} total users
+            {t("users.totalUsers", { count: data?.total ?? 0 })}
           </p>
         </div>
         <Button type="button" onClick={() => setInviting(true)}>
           <Plus size={16} />
-          Invite User
+          {t("users.inviteUser")}
         </Button>
       </div>
 
@@ -57,11 +61,11 @@ export default function UsersPage() {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-slate-100 dark:border-white/10 text-left text-xs font-medium text-slate-500 dark:text-slate-400">
-              <th className="px-5 py-3">User</th>
-              <th className="px-5 py-3">Status</th>
-              <th className="px-5 py-3">Roles</th>
-              <th className="px-5 py-3">Provider</th>
-              <th className="px-5 py-3">Last Login</th>
+              <th className="px-5 py-3">{t("users.user")}</th>
+              <th className="px-5 py-3">{t("common.status")}</th>
+              <th className="px-5 py-3">{t("users.roles")}</th>
+              <th className="px-5 py-3">{t("users.provider")}</th>
+              <th className="px-5 py-3">{t("users.lastLogin")}</th>
               <th className="px-5 py-3" />
             </tr>
           </thead>
@@ -69,7 +73,7 @@ export default function UsersPage() {
             {isLoading && (
               <tr>
                 <td colSpan={6} className="py-12 text-center text-slate-400">
-                  Loading…
+                  {t("common.loading")}
                 </td>
               </tr>
             )}
@@ -101,7 +105,7 @@ export default function UsersPage() {
                           : "badge-gray"
                     }`}
                   >
-                    {user.status}
+                    {statusLabel(t, user.status)}
                   </span>
                 </td>
                 <td className="px-5 py-3">
@@ -134,7 +138,7 @@ export default function UsersPage() {
                     size="sm"
                     onClick={() => setEditing(user)}
                   >
-                    Edit
+                    {t("common.edit")}
                   </Button>
                 </td>
               </tr>
@@ -142,7 +146,7 @@ export default function UsersPage() {
             {!isLoading && !data?.data?.length && (
               <tr>
                 <td colSpan={6} className="py-12 text-center text-slate-400">
-                  No users found
+                  {t("users.noUsersFound")}
                 </td>
               </tr>
             )}
@@ -162,6 +166,16 @@ export default function UsersPage() {
 }
 
 function EditUserPanel({ user, onClose }: { user: User; onClose: () => void }) {
+  const { t } = useTranslation();
+  const STATUSES = STATUS_VALUES.map((v) => ({
+    value: v,
+    label:
+      v === "active"
+        ? t("common.active")
+        : v === "inactive"
+          ? t("users.statusInactive")
+          : t("users.statusSuspended"),
+  }));
   const queryClient = useQueryClient();
   const languages = useAvailableLanguages();
   const [firstName, setFirstName] = useState(user.first_name);
@@ -227,7 +241,7 @@ function EditUserPanel({ user, onClose }: { user: User; onClose: () => void }) {
     mutationFn: (pwd: string) => post(`/users/${user.id}/password`, { password: pwd }),
     onSuccess: () => {
       setPassword("");
-      setPasswordMsg("Password updated");
+      setPasswordMsg(t("users.passwordUpdated"));
     },
     onError: (e: Error) => setPasswordMsg(e.message),
   });
@@ -271,7 +285,7 @@ function EditUserPanel({ user, onClose }: { user: User; onClose: () => void }) {
           <div className="flex shrink-0 items-center justify-between border-b border-slate-100 dark:border-white/10 px-6 py-5">
             <div>
               <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">
-                Edit User
+                {t("users.editUser")}
               </h2>
               <p className="mt-0.5 text-xs text-slate-400">{user.email}</p>
             </div>
@@ -288,7 +302,7 @@ function EditUserPanel({ user, onClose }: { user: User; onClose: () => void }) {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="mb-1.5 block text-xs font-medium text-slate-700 dark:text-slate-200">
-                  First name
+                  {t("users.firstName")}
                 </label>
                 <input
                   className="input"
@@ -299,7 +313,7 @@ function EditUserPanel({ user, onClose }: { user: User; onClose: () => void }) {
               </div>
               <div>
                 <label className="mb-1.5 block text-xs font-medium text-slate-700 dark:text-slate-200">
-                  Last name
+                  {t("users.lastName")}
                 </label>
                 <input
                   className="input"
@@ -312,7 +326,7 @@ function EditUserPanel({ user, onClose }: { user: User; onClose: () => void }) {
 
             <div>
               <label className="mb-1.5 block text-xs font-medium text-slate-700 dark:text-slate-200">
-                Status
+                {t("common.status")}
               </label>
               <Select.Root value={status} onValueChange={(v) => setStatus(v as UserStatus)}>
                 <Select.Trigger className="flex h-10 w-full items-center justify-between rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 text-sm text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-100 dark:focus:ring-brand-500/20">
@@ -345,7 +359,7 @@ function EditUserPanel({ user, onClose }: { user: User; onClose: () => void }) {
 
             <div>
               <label className="mb-1.5 block text-xs font-medium text-slate-700 dark:text-slate-200">
-                Language
+                {t("common.language")}
               </label>
               <LanguageSelector
                 value={language}
@@ -359,19 +373,18 @@ function EditUserPanel({ user, onClose }: { user: User; onClose: () => void }) {
               <div className="flex items-center gap-2">
                 <Shield size={14} className="text-slate-400" />
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                  Roles
+                  {t("users.roles")}
                 </p>
               </div>
               <p className="text-[11px] text-slate-400">
-                Collection permissions come from roles. Assign roles here; edit
-                permissions on the Roles page.
+                {t("users.rolesHint")}
               </p>
 
               {detailLoading ? (
-                <p className="text-xs text-slate-400">Loading roles…</p>
+                <p className="text-xs text-slate-400">{t("users.loadingRoles")}</p>
               ) : assigned.length === 0 ? (
                 <p className="rounded-xl border border-dashed border-slate-200 dark:border-white/10 px-3 py-4 text-center text-xs text-slate-400">
-                  No roles assigned
+                  {t("users.noRolesAssigned")}
                 </p>
               ) : (
                 <ul className="space-y-1.5">
@@ -384,7 +397,7 @@ function EditUserPanel({ user, onClose }: { user: User; onClose: () => void }) {
                         <p className="truncate text-sm font-medium text-slate-800 dark:text-slate-100">
                           {r.name}
                           {r.is_system && (
-                            <span className="ml-1.5 badge badge-gray">system</span>
+                            <span className="ml-1.5 badge badge-gray">{t("users.systemLabel")}</span>
                           )}
                         </p>
                         {r.description && (
@@ -396,7 +409,7 @@ function EditUserPanel({ user, onClose }: { user: User; onClose: () => void }) {
                         disabled={busy}
                         onClick={() => revokeMut.mutate(r.id)}
                         className="rounded-lg p-1.5 text-slate-300 transition hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-500/10"
-                        title="Revoke role"
+                        title={t("users.revokeRole")}
                       >
                         <Trash2 size={13} />
                       </button>
@@ -409,7 +422,7 @@ function EditUserPanel({ user, onClose }: { user: User; onClose: () => void }) {
                 <div className="flex gap-2">
                   <Select.Root value={roleToAdd || undefined} onValueChange={setRoleToAdd}>
                     <Select.Trigger className="flex h-9 min-w-0 flex-1 items-center justify-between rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-2.5 text-xs text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-100">
-                      <Select.Value placeholder="Add a role…" />
+                      <Select.Value placeholder={t("users.addRolePlaceholder")} />
                       <Select.Icon>
                         <ChevronDown size={12} className="text-slate-400" />
                       </Select.Icon>
@@ -440,7 +453,7 @@ function EditUserPanel({ user, onClose }: { user: User; onClose: () => void }) {
                     disabled={!roleToAdd || busy}
                     onClick={() => roleToAdd && assignMut.mutate(roleToAdd)}
                   >
-                    Add
+                    {t("common.add")}
                   </Button>
                 </div>
               )}
@@ -455,7 +468,7 @@ function EditUserPanel({ user, onClose }: { user: User; onClose: () => void }) {
             {user.provider === "local" && (
               <div className="space-y-3 rounded-xl border border-slate-100 dark:border-white/10 px-4 py-4">
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                  Password
+                  {t("common.password")}
                 </p>
                 <input
                   type="password"
@@ -465,7 +478,7 @@ function EditUserPanel({ user, onClose }: { user: User; onClose: () => void }) {
                     setPassword(e.target.value);
                     setPasswordMsg(null);
                   }}
-                  placeholder="New password (min 8)"
+                  placeholder={t("users.newPasswordPlaceholder")}
                   autoComplete="new-password"
                 />
                 <Button
@@ -475,7 +488,7 @@ function EditUserPanel({ user, onClose }: { user: User; onClose: () => void }) {
                   disabled={busy || password.length < 8}
                   onClick={() => passwordMut.mutate(password)}
                 >
-                  {passwordMut.isPending ? "Updating…" : "Update password"}
+                  {passwordMut.isPending ? t("common.updating") : t("users.updatePassword")}
                 </Button>
                 {passwordMsg && (
                   <p
@@ -491,12 +504,12 @@ function EditUserPanel({ user, onClose }: { user: User; onClose: () => void }) {
 
             <div className="rounded-xl border border-slate-100 dark:border-white/10 bg-slate-50/80 dark:bg-white/[0.03] px-4 py-3 text-xs text-slate-400">
               <p>
-                Provider:{" "}
+                {t("users.provider")}:{" "}
                 <span className="font-medium text-slate-600 dark:text-slate-300">
                   {user.provider}
                 </span>
               </p>
-              <p className="mt-1">Email cannot be changed here.</p>
+              <p className="mt-1">{t("users.emailImmutable")}</p>
             </div>
 
             {profileMut.isError && (
@@ -508,13 +521,13 @@ function EditUserPanel({ user, onClose }: { user: User; onClose: () => void }) {
 
           <div className="flex shrink-0 items-center justify-between border-t border-slate-100 dark:border-white/10 px-6 py-4">
             <Button type="button" variant="ghost" onClick={onClose}>
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button
               type="submit"
               disabled={busy || !firstName.trim() || !lastName.trim()}
             >
-              {profileMut.isPending ? "Saving…" : "Save Changes"}
+              {profileMut.isPending ? t("common.saving") : t("users.saveChanges")}
             </Button>
           </div>
         </form>
@@ -527,6 +540,7 @@ function EditUserPanel({ user, onClose }: { user: User; onClose: () => void }) {
 // ── Invite user panel ───────────────────────────────────────────────────────────
 
 function InviteUserPanel({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const [email, setEmail] = useState("");
   const [firstName, setFirstName] = useState("");
@@ -582,7 +596,7 @@ function InviteUserPanel({ open, onClose }: { open: boolean; onClose: () => void
             <div className="flex shrink-0 items-center justify-between border-b border-slate-100 px-6 py-5 dark:border-white/10">
               <h2 className="flex items-center gap-2 text-base font-semibold text-slate-900 dark:text-slate-100">
                 <Mail size={17} className="text-slate-400" />
-                Invite user
+                {t("users.inviteUserTitle")}
               </h2>
               <button type="button" onClick={close} className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 dark:hover:bg-white/5">
                 <X size={18} />
@@ -594,11 +608,11 @@ function InviteUserPanel({ open, onClose }: { open: boolean; onClose: () => void
                 <div className="flex items-start gap-2 rounded-xl bg-emerald-50 px-3 py-2.5 text-sm text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300">
                   <Check size={15} className="mt-0.5 shrink-0" />
                   {result.email_sent
-                    ? `Invitation emailed to ${email}.`
-                    : `User created. Email isn't configured — share this invite link manually.`}
+                    ? t("users.invitationEmailed", { email })
+                    : t("users.inviteNoEmail")}
                 </div>
                 <div>
-                  <label className="mb-1.5 block text-xs font-medium text-slate-700 dark:text-slate-200">Invite link</label>
+                  <label className="mb-1.5 block text-xs font-medium text-slate-700 dark:text-slate-200">{t("users.inviteLink")}</label>
                   <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 p-2.5 dark:border-white/10 dark:bg-white/5">
                     <code className="flex-1 break-all font-mono text-xs text-slate-700 dark:text-slate-200">{result.invite_link}</code>
                     <button type="button"
@@ -607,34 +621,34 @@ function InviteUserPanel({ open, onClose }: { open: boolean; onClose: () => void
                       {copied ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
                     </button>
                   </div>
-                  <p className="mt-1 text-xs text-slate-400">Valid for 7 days. The recipient sets their password to activate the account.</p>
+                  <p className="mt-1 text-xs text-slate-400">{t("users.inviteLinkHint")}</p>
                 </div>
                 <div className="flex gap-2 pt-2">
-                  <Button variant="ghost" onClick={reset}>Invite another</Button>
-                  <Button onClick={close}>Done</Button>
+                  <Button variant="ghost" onClick={reset}>{t("users.inviteAnother")}</Button>
+                  <Button onClick={close}>{t("users.done")}</Button>
                 </div>
               </div>
             ) : (
               <>
                 <div className="flex-1 space-y-5 overflow-y-auto px-6 py-6">
                   <div>
-                    <label className="mb-1.5 block text-xs font-medium text-slate-700 dark:text-slate-200">Email <span className="text-red-400">*</span></label>
-                    <input className="input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="person@company.com" />
+                    <label className="mb-1.5 block text-xs font-medium text-slate-700 dark:text-slate-200">{t("common.email")} <span className="text-red-400">*</span></label>
+                    <input className="input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder={t("users.emailPlaceholder")} />
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="mb-1.5 block text-xs font-medium text-slate-700 dark:text-slate-200">First name</label>
-                      <input className="input" value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="Jane" />
+                      <label className="mb-1.5 block text-xs font-medium text-slate-700 dark:text-slate-200">{t("users.firstName")}</label>
+                      <input className="input" value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder={t("users.firstNamePlaceholder")} />
                     </div>
                     <div>
-                      <label className="mb-1.5 block text-xs font-medium text-slate-700 dark:text-slate-200">Last name</label>
-                      <input className="input" value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="Doe" />
+                      <label className="mb-1.5 block text-xs font-medium text-slate-700 dark:text-slate-200">{t("users.lastName")}</label>
+                      <input className="input" value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder={t("users.lastNamePlaceholder")} />
                     </div>
                   </div>
                   <div>
-                    <label className="mb-1.5 block text-xs font-medium text-slate-700 dark:text-slate-200">Roles</label>
+                    <label className="mb-1.5 block text-xs font-medium text-slate-700 dark:text-slate-200">{t("users.roles")}</label>
                     <div className="space-y-1.5">
-                      {roles.length === 0 && <p className="text-xs text-slate-400">No roles available.</p>}
+                      {roles.length === 0 && <p className="text-xs text-slate-400">{t("users.noRolesAvailable")}</p>}
                       {roles.map((role) => (
                         <label key={role.id} className="flex cursor-pointer items-center gap-2.5 rounded-lg border border-slate-100 px-3 py-2 dark:border-white/10">
                           <input type="checkbox" checked={roleIds.includes(role.id)} onChange={() => toggleRole(role.id)}
@@ -651,9 +665,9 @@ function InviteUserPanel({ open, onClose }: { open: boolean; onClose: () => void
                   )}
                 </div>
                 <div className="flex shrink-0 items-center justify-end gap-2 border-t border-slate-100 px-6 py-4 dark:border-white/10">
-                  <Button variant="ghost" onClick={close}>Cancel</Button>
+                  <Button variant="ghost" onClick={close}>{t("common.cancel")}</Button>
                   <Button onClick={() => { setError(null); mutation.mutate(); }} loading={mutation.isPending} disabled={!email.trim()}>
-                    Send invite
+                    {t("users.sendInvite")}
                   </Button>
                 </div>
               </>

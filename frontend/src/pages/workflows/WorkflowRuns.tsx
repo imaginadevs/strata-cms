@@ -2,6 +2,7 @@
  * Workflow run history — poll list, open run detail drawer with steps.
  */
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { createPortal } from "react-dom";
 import { Link, useParams } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
@@ -17,18 +18,25 @@ import type {
   WorkflowRun,
   WorkflowRunStatus,
 } from "@/types";
-import { runStatusBadge, triggerTypeLabel } from "./helpers";
+import {
+  actionTypeLabel,
+  runStatusBadge,
+  runStatusLabel,
+  triggerTypeLabel,
+} from "./helpers";
 
+/** `label` is an i18n key, resolved with t() at render. */
 const STATUS_FILTERS: Array<{ value: "" | WorkflowRunStatus; label: string }> =
   [
-    { value: "", label: "All" },
-    { value: "pending", label: "Pending" },
-    { value: "running", label: "Running" },
-    { value: "success", label: "Success" },
-    { value: "failed", label: "Failed" },
+    { value: "", label: "common.all" },
+    { value: "pending", label: "workflows.runStatus.pending" },
+    { value: "running", label: "workflows.runStatus.running" },
+    { value: "success", label: "workflows.runStatus.success" },
+    { value: "failed", label: "workflows.runStatus.failed" },
   ];
 
 export default function WorkflowRunsPage() {
+  const { t } = useTranslation();
   const { id } = useParams({ strict: false }) as { id: string };
   const [status, setStatus] = useState<"" | WorkflowRunStatus>("");
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
@@ -70,7 +78,7 @@ export default function WorkflowRunsPage() {
           </Link>
           <div>
             <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">
-              Run history
+              {t("workflows.runHistory")}
             </h1>
             <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
               {workflow?.name ?? "…"}
@@ -78,7 +86,7 @@ export default function WorkflowRunsPage() {
                 <>
                   {" · "}
                   <span className="badge badge-gray">
-                    {triggerTypeLabel(workflow.trigger.type)}
+                    {triggerTypeLabel(t, workflow.trigger.type)}
                   </span>
                 </>
               ) : null}
@@ -94,14 +102,14 @@ export default function WorkflowRunsPage() {
             disabled={isFetching}
           >
             <RefreshCw size={14} className={isFetching ? "animate-spin" : ""} />
-            Refresh
+            {t("workflows.runs.refresh")}
           </Button>
           <Link
             to="/workflows/$id"
             params={{ id }}
             className="inline-flex h-8 items-center rounded-xl px-3 text-xs font-medium text-slate-600 transition hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-slate-100"
           >
-            Edit workflow
+            {t("workflows.runs.editWorkflow")}
           </Link>
         </div>
       </div>
@@ -118,7 +126,7 @@ export default function WorkflowRunsPage() {
                 : "text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-white/5"
             }`}
           >
-            {f.label}
+            {t(f.label)}
           </button>
         ))}
       </div>
@@ -127,25 +135,25 @@ export default function WorkflowRunsPage() {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-slate-100 text-left text-xs font-medium text-slate-500 dark:border-white/10 dark:text-slate-400">
-              <th className="px-5 py-3">Status</th>
-              <th className="px-5 py-3">Collection / item</th>
-              <th className="px-5 py-3">Started</th>
-              <th className="px-5 py-3">Finished</th>
-              <th className="px-5 py-3">Error</th>
+              <th className="px-5 py-3">{t("common.status")}</th>
+              <th className="px-5 py-3">{t("workflows.runs.collectionItem")}</th>
+              <th className="px-5 py-3">{t("workflows.runs.started")}</th>
+              <th className="px-5 py-3">{t("workflows.runs.finished")}</th>
+              <th className="px-5 py-3">{t("workflows.runs.error")}</th>
             </tr>
           </thead>
           <tbody>
             {isLoading && (
               <tr>
                 <td colSpan={5} className="py-12 text-center text-slate-400">
-                  Loading…
+                  {t("common.loading")}
                 </td>
               </tr>
             )}
             {!isLoading && runs.length === 0 && (
               <tr>
                 <td colSpan={5} className="py-12 text-center text-slate-400">
-                  No runs yet
+                  {t("workflows.runs.noRuns")}
                 </td>
               </tr>
             )}
@@ -156,7 +164,9 @@ export default function WorkflowRunsPage() {
                 onClick={() => setSelectedRunId(run.id)}
               >
                 <td className="px-5 py-3">
-                  <span className={runStatusBadge(run.status)}>{run.status}</span>
+                  <span className={runStatusBadge(run.status)}>
+                    {runStatusLabel(t, run.status)}
+                  </span>
                 </td>
                 <td className="px-5 py-3">
                   <p className="font-mono text-xs text-slate-700 dark:text-slate-200">
@@ -206,6 +216,7 @@ function RunDetailPanel({
   runId: string;
   onClose: () => void;
 }) {
+  const { t } = useTranslation();
   const { data: run, isLoading, isFetching } = useQuery({
     queryKey: ["workflows", "runs", runId],
     queryFn: () => get<WorkflowRun>(`/workflows/runs/${runId}`),
@@ -248,7 +259,7 @@ function RunDetailPanel({
         <div className="flex shrink-0 items-center justify-between border-b border-slate-100 px-6 py-5 dark:border-white/10">
           <div>
             <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">
-              Run detail
+              {t("workflows.runs.runDetail")}
             </h2>
             <p className="mt-0.5 font-mono text-[10px] text-slate-400">{runId}</p>
           </div>
@@ -263,37 +274,43 @@ function RunDetailPanel({
 
         <div className="flex-1 space-y-4 overflow-y-auto px-6 py-5">
           {isLoading || !run ? (
-            <p className="py-10 text-center text-sm text-slate-400">Loading…</p>
+            <p className="py-10 text-center text-sm text-slate-400">
+              {t("common.loading")}
+            </p>
           ) : (
             <>
               <div className="flex flex-wrap items-center gap-2">
-                <span className={runStatusBadge(run.status)}>{run.status}</span>
+                <span className={runStatusBadge(run.status)}>
+                  {runStatusLabel(t, run.status)}
+                </span>
                 {isFetching && (
-                  <span className="text-[10px] text-slate-400">Updating…</span>
+                  <span className="text-[10px] text-slate-400">
+                    {t("common.updating")}
+                  </span>
                 )}
               </div>
 
               <dl className="grid grid-cols-2 gap-3 text-xs">
                 <div>
-                  <dt className="text-slate-400">Collection</dt>
+                  <dt className="text-slate-400">{t("workflows.runs.collection")}</dt>
                   <dd className="mt-0.5 font-mono text-slate-800 dark:text-slate-100">
                     {run.collection}
                   </dd>
                 </div>
                 <div>
-                  <dt className="text-slate-400">Item</dt>
+                  <dt className="text-slate-400">{t("workflows.runs.item")}</dt>
                   <dd className="mt-0.5 truncate font-mono text-slate-800 dark:text-slate-100">
                     {run.item_id || "—"}
                   </dd>
                 </div>
                 <div>
-                  <dt className="text-slate-400">Started</dt>
+                  <dt className="text-slate-400">{t("workflows.runs.started")}</dt>
                   <dd className="mt-0.5 text-slate-800 dark:text-slate-100">
                     {formatDate(run.started_at)}
                   </dd>
                 </div>
                 <div>
-                  <dt className="text-slate-400">Finished</dt>
+                  <dt className="text-slate-400">{t("workflows.runs.finished")}</dt>
                   <dd className="mt-0.5 text-slate-800 dark:text-slate-100">
                     {run.finished_at ? formatDate(run.finished_at) : "—"}
                   </dd>
@@ -308,10 +325,12 @@ function RunDetailPanel({
 
               <div>
                 <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                  Steps
+                  {t("workflows.runs.steps")}
                 </p>
                 {steps.length === 0 ? (
-                  <p className="text-xs text-slate-400">No steps</p>
+                  <p className="text-xs text-slate-400">
+                    {t("workflows.runs.noSteps")}
+                  </p>
                 ) : (
                   <ul className="space-y-2">
                     {steps.map((step) => (
@@ -321,10 +340,10 @@ function RunDetailPanel({
                       >
                         <div className="flex items-center justify-between gap-2">
                           <p className="text-sm font-medium text-slate-800 dark:text-slate-100">
-                            {step.action_type}
+                            {actionTypeLabel(t, step.action_type)}
                           </p>
                           <span className={runStatusBadge(step.status)}>
-                            {step.status}
+                            {runStatusLabel(t, step.status)}
                           </span>
                         </div>
                         {step.error && (

@@ -6,6 +6,7 @@ import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 
 import { router } from "@/routes";
 import { initTheme } from "@/store/theme.store";
+import "@/lib/i18n"; // initializes i18next (reads the persisted UI language) before render
 import "@/styles/globals.css";
 
 // Apply persisted light/dark theme before first paint (no flash).

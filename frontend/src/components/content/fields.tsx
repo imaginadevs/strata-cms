@@ -7,6 +7,7 @@
  */
 import { useState, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { motion, AnimatePresence } from "framer-motion";
 import * as Select from "@radix-ui/react-select";
 import * as Switch from "@radix-ui/react-switch";
@@ -42,10 +43,11 @@ export function LanguageSelector({
   onChange: (lang: string) => void;
   languages: string[];
 }) {
+  const { t } = useTranslation();
   return (
     <div className="flex items-center gap-2 rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-1.5">
       <Globe size={13} className="shrink-0 text-slate-400" />
-      <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Language</span>
+      <span className="text-xs font-medium text-slate-500 dark:text-slate-400">{t("common.language")}</span>
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
@@ -70,6 +72,7 @@ export function JsonInput({
   onChange: (v: unknown) => void;
   error?: string;
 }) {
+  const { t } = useTranslation();
   const base =
     "w-full rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2 text-sm text-slate-800 dark:text-slate-100 " +
     "placeholder:text-slate-400 focus:border-brand-400 dark:focus:border-brand-500/60 focus:outline-none focus:ring-2 focus:ring-brand-100 dark:focus:ring-brand-500/20" +
@@ -91,7 +94,7 @@ export function JsonInput({
   function handleValidate() {
     try {
       JSON.parse(localText);
-      showFeedback(true, "✓ Valid JSON");
+      showFeedback(true, t("content.validJson"));
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
       showFeedback(false, msg);
@@ -103,7 +106,7 @@ export function JsonInput({
       const formatted = JSON.stringify(JSON.parse(localText), null, 2);
       setLocalText(formatted);
       onChange(formatted);
-      showFeedback(true, "✓ Formatted");
+      showFeedback(true, t("content.formatted"));
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
       showFeedback(false, msg);
@@ -124,11 +127,11 @@ export function JsonInput({
       <div className="flex items-center gap-2">
         <button type="button" className={helperBtn} onClick={handleValidate}>
           <Check size={11} className="mr-1 inline" />
-          Validate
+          {t("content.validate")}
         </button>
         <button type="button" className={helperBtn} onClick={handleFormat}>
           <RefreshCw size={11} className="mr-1 inline" />
-          Format
+          {t("content.format")}
         </button>
         {feedback && (
           <span
@@ -155,6 +158,7 @@ export function RelationInput({
   onChange: (v: unknown) => void;
   error?: string;
 }) {
+  const { t } = useTranslation();
   const base =
     "w-full rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2 text-sm text-slate-800 dark:text-slate-100 " +
     "placeholder:text-slate-400 focus:border-brand-400 dark:focus:border-brand-500/60 focus:outline-none focus:ring-2 focus:ring-brand-100 dark:focus:ring-brand-500/20" +
@@ -196,9 +200,9 @@ export function RelationInput({
           className={base + " font-mono"}
           value={value == null ? "" : String(value)}
           onChange={(e) => onChange(e.target.value || null)}
-          placeholder="Enter UUID…"
+          placeholder={t("content.enterUuid")}
         />
-        <p className="text-xs text-slate-400">Related collection not configured</p>
+        <p className="text-xs text-slate-400">{t("content.relatedNotConfigured")}</p>
       </div>
     );
   }
@@ -244,7 +248,7 @@ export function RelationInput({
           {currentDisplay ? (
             <span className="text-slate-800 dark:text-slate-100">{currentDisplay}</span>
           ) : (
-            <span className="text-slate-400">No selection</span>
+            <span className="text-slate-400">{t("content.noSelection")}</span>
           )}
         </div>
         <Popover.Trigger asChild>
@@ -252,7 +256,7 @@ export function RelationInput({
             type="button"
             className="shrink-0 rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2 text-xs font-medium text-slate-600 dark:text-slate-300 transition hover:bg-slate-50 dark:hover:bg-white/5 hover:text-slate-800 dark:hover:text-slate-100"
           >
-            Browse
+            {t("content.browse")}
           </button>
         </Popover.Trigger>
         {value != null && (
@@ -274,13 +278,13 @@ export function RelationInput({
             autoFocus
             type="text"
             className="mb-2 w-full rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-1.5 text-sm text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:border-brand-400 dark:focus:border-brand-500/60 focus:outline-none focus:ring-2 focus:ring-brand-100 dark:focus:ring-brand-500/20"
-            placeholder="Search…"
+            placeholder={t("common.search")}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
           <div className="max-h-56 overflow-y-auto">
             {filtered.length === 0 ? (
-              <p className="px-3 py-2 text-xs text-slate-400">No items found</p>
+              <p className="px-3 py-2 text-xs text-slate-400">{t("common.noResults")}</p>
             ) : (
               filtered.map((item) => (
                 <button
@@ -327,6 +331,7 @@ function formatBytes(n: number): string {
 
 /** A single stored file, resolved by id, shown as an image thumbnail or a file chip. */
 function FileCard({ id, onRemove }: { id: string; onRemove: () => void }) {
+  const { t } = useTranslation();
   const { data: file, isLoading } = useQuery({
     queryKey: ["file", id],
     queryFn: () => get<StoredFile>(`/files/${id}`),
@@ -346,12 +351,13 @@ function FileCard({ id, onRemove }: { id: string; onRemove: () => void }) {
       </div>
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm text-slate-800 dark:text-slate-100">
-          {isLoading ? "Loading…" : file?.filename ?? id}
+          {isLoading ? t("common.loading") : file?.filename ?? id}
         </p>
         {file && (
           <p className="text-xs text-slate-400">
             {formatBytes(file.size)}
-            {file.is_public ? " · public" : " · private"}
+            {" · "}
+            {file.is_public ? t("content.public") : t("content.private")}
           </p>
         )}
       </div>
@@ -361,7 +367,7 @@ function FileCard({ id, onRemove }: { id: string; onRemove: () => void }) {
           target="_blank"
           rel="noreferrer"
           className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-slate-200 dark:border-white/10 text-slate-400 transition hover:text-slate-600 dark:hover:text-slate-200"
-          title="Open"
+          title={t("content.open")}
         >
           <ExternalLink size={13} />
         </a>
@@ -370,7 +376,7 @@ function FileCard({ id, onRemove }: { id: string; onRemove: () => void }) {
         type="button"
         onClick={onRemove}
         className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-slate-200 dark:border-white/10 text-slate-400 transition hover:bg-red-50 dark:hover:bg-red-500/10 hover:text-red-500 dark:hover:text-red-400"
-        title="Remove"
+        title={t("common.remove")}
       >
         <X size={13} />
       </button>
@@ -383,6 +389,7 @@ const uploadBtn =
 
 /** Hidden <input type=file> + a trigger button; uploads then calls onUploaded(id). */
 function useFileUpload(onUploaded: (id: string) => void, multiple: boolean) {
+  const { t } = useTranslation();
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadErr, setUploadErr] = useState<string | null>(null);
@@ -400,7 +407,7 @@ function useFileUpload(onUploaded: (id: string) => void, multiple: boolean) {
         onUploaded(res.id);
       }
     } catch (e) {
-      setUploadErr(e instanceof Error ? e.message : "upload failed");
+      setUploadErr(e instanceof Error ? e.message : t("content.uploadFailed"));
     } finally {
       setUploading(false);
       if (inputRef.current) inputRef.current.value = "";
@@ -420,6 +427,7 @@ export function FileInput({
   onChange: (v: unknown) => void;
   error?: string;
 }) {
+  const { t } = useTranslation();
   const id = typeof value === "string" && value ? value : null;
   const { inputRef, uploading, uploadErr, handleFiles } = useFileUpload(
     (fileId) => onChange(fileId),
@@ -439,7 +447,7 @@ export function FileInput({
       ) : (
         <button type="button" className={uploadBtn} onClick={() => inputRef.current?.click()} disabled={uploading}>
           <Upload size={14} />
-          {uploading ? "Uploading…" : "Upload file"}
+          {uploading ? t("content.uploading") : t("content.uploadFile")}
         </button>
       )}
       {uploadErr && <p className="text-xs text-red-500 dark:text-red-400">{uploadErr}</p>}
@@ -457,6 +465,7 @@ export function FilesInput({
   onChange: (v: unknown) => void;
   error?: string;
 }) {
+  const { t } = useTranslation();
   const ids: string[] = (() => {
     if (Array.isArray(value)) return value as string[];
     if (typeof value === "string" && value.trim()) {
@@ -495,7 +504,7 @@ export function FilesInput({
       )}
       <button type="button" className={uploadBtn} onClick={() => inputRef.current?.click()} disabled={uploading}>
         <Upload size={14} />
-        {uploading ? "Uploading…" : "Add file(s)"}
+        {uploading ? t("content.uploading") : t("content.addFiles")}
       </button>
       {uploadErr && <p className="text-xs text-red-500 dark:text-red-400">{uploadErr}</p>}
     </div>
@@ -515,6 +524,7 @@ export function FieldInput({
   onChange: (v: unknown) => void;
   error?: string;
 }) {
+  const { t } = useTranslation();
   const base =
     "w-full rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2 text-sm text-slate-800 dark:text-slate-100 " +
     "placeholder:text-slate-400 focus:border-brand-400 dark:focus:border-brand-500/60 focus:outline-none focus:ring-2 focus:ring-brand-100 dark:focus:ring-brand-500/20" +
@@ -542,7 +552,7 @@ export function FieldInput({
               }`}
             />
           </Switch.Root>
-          <span className="text-sm text-slate-600 dark:text-slate-300">{value ? "Yes" : "No"}</span>
+          <span className="text-sm text-slate-600 dark:text-slate-300">{value ? t("common.yes") : t("common.no")}</span>
         </div>
       );
 
@@ -552,7 +562,7 @@ export function FieldInput({
           className={base + " min-h-[120px] resize-y"}
           value={str}
           onChange={(e) => onChange(e.target.value)}
-          placeholder={`Enter ${field.display_name.toLowerCase()}…`}
+          placeholder={t("content.enterField", { field: field.display_name.toLowerCase() })}
         />
       );
 
@@ -562,7 +572,7 @@ export function FieldInput({
           value={str}
           onChange={onChange}
           error={!!error}
-          placeholder={`Enter ${field.display_name.toLowerCase()}…`}
+          placeholder={t("content.enterField", { field: field.display_name.toLowerCase() })}
         />
       );
 
@@ -570,6 +580,11 @@ export function FieldInput({
       return <JsonInput value={value} onChange={onChange} error={error} />;
 
     case "uuid":
+      // A UUID column that is a relation foreign key renders as a picker (its
+      // related collection is injected into options via withRelationOptions).
+      if ((field.options as Record<string, unknown> | undefined)?.related_collection) {
+        return <RelationInput field={field} value={value} onChange={onChange} error={error} />;
+      }
       return (
         <div className="flex items-center gap-2">
           <input
@@ -584,7 +599,7 @@ export function FieldInput({
             className={helperBtn}
             onClick={() => onChange(crypto.randomUUID())}
           >
-            Generate
+            {t("content.generate")}
           </button>
         </div>
       );
@@ -603,7 +618,7 @@ export function FieldInput({
             className={helperBtn}
             onClick={() => onChange(new Date().toISOString().slice(0, 10))}
           >
-            Today
+            {t("content.today")}
           </button>
         </div>
       );
@@ -630,7 +645,7 @@ export function FieldInput({
             }}
           >
             <Clock size={11} className="mr-1 inline" />
-            Now
+            {t("content.now")}
           </button>
         </div>
       );
@@ -683,7 +698,7 @@ export function FieldInput({
           onValueChange={(v) => onChange(v === "__none__" ? null : v || null)}
         >
           <Select.Trigger className="flex w-full items-center justify-between rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2 text-sm text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-100 dark:focus:ring-brand-500/20 focus:border-brand-400 dark:focus:border-brand-500/60 [&[data-placeholder]]:text-slate-400">
-            <Select.Value placeholder="— select —" />
+            <Select.Value placeholder={t("content.selectPlaceholder")} />
             <Select.Icon>
               <ChevronDown size={14} className="text-slate-400" />
             </Select.Icon>
@@ -695,7 +710,7 @@ export function FieldInput({
                   value="__none__"
                   className="cursor-pointer rounded-lg px-3 py-2 text-sm text-slate-400 outline-none hover:bg-slate-50 dark:hover:bg-white/5 data-[highlighted]:bg-brand-50 dark:data-[highlighted]:bg-brand-500/15 data-[highlighted]:text-brand-700 dark:data-[highlighted]:text-brand-300"
                 >
-                  <Select.ItemText>— None —</Select.ItemText>
+                  <Select.ItemText>{t("content.noneOption")}</Select.ItemText>
                 </Select.Item>
                 {choices.map((c) => (
                   <Select.Item
@@ -720,7 +735,7 @@ export function FieldInput({
           className={base + " font-mono"}
           value={str}
           onChange={(e) => onChange(e.target.value || null)}
-          placeholder="192.168.1.1 or 2001:db8::1"
+          placeholder={t("content.ipPlaceholder")}
         />
       );
 
@@ -742,7 +757,7 @@ export function FieldInput({
           className={base}
           value={str}
           onChange={(e) => onChange(e.target.value || null)}
-          placeholder={`Enter ${field.display_name.toLowerCase()}…`}
+          placeholder={t("content.enterField", { field: field.display_name.toLowerCase() })}
         />
       );
   }
@@ -774,6 +789,7 @@ export function FieldGroup({
   onChange: (name: string, v: unknown) => void;
   gridClass?: string;
 }) {
+  const { t } = useTranslation();
   const [showAdvanced, setShowAdvanced] = useState(false);
 
   const visibleFields = fields.filter((f) => !f.hidden);
@@ -815,7 +831,7 @@ export function FieldGroup({
             className="flex items-center gap-1.5 text-xs font-medium text-slate-400 transition hover:text-slate-600"
           >
             <EyeOff size={13} />
-            {showAdvanced ? "Hide" : "Show"} advanced fields
+            {showAdvanced ? t("content.hideAdvanced") : t("content.showAdvanced")}
             <span className="ml-0.5 rounded-full bg-slate-100 dark:bg-white/5 px-1.5 py-0.5 text-[10px] text-slate-500 dark:text-slate-400">
               {hiddenFields.length}
             </span>

@@ -1,0 +1,7 @@
+{
+  "notFound": {
+    "title": "Página no encontrada",
+    "message": "La página que buscas no existe.",
+    "backToDashboard": "Volver al panel"
+  }
+}

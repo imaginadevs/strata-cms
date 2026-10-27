@@ -9,6 +9,7 @@ import { sseClient } from "@/lib/sse";
 import { useAuthStore } from "@/store/auth.store";
 import { useUIStore } from "@/store/ui.store";
 import { useNotificationsRealtime } from "@/hooks/useNotificationsRealtime";
+import { syncUILanguage } from "@/lib/i18n";
 
 // ── Skeleton shown while a lazy page chunk is downloading ─────────────────────
 function PageSkeleton() {
@@ -51,9 +52,15 @@ interface Props {
 
 export function AppShell({ children }: Props) {
   const { isAuthenticated, accessToken } = useAuthStore();
+  const uiLanguage = useAuthStore((s) => s.user?.ui_language);
   const { sidebarOpen, closeSidebar } = useUIStore();
 
   useNotificationsRealtime();
+
+  // Keep the interface language in sync with the signed-in user's preference.
+  useEffect(() => {
+    syncUILanguage(uiLanguage);
+  }, [uiLanguage]);
 
   useEffect(() => {
     if (!isAuthenticated || !accessToken) {

@@ -81,6 +81,8 @@ type userInfo struct {
 	Avatar       *string  `json:"avatar,omitempty"`
 	Roles        []string `json:"roles"`
 	IsSuperAdmin bool     `json:"is_super_admin"`
+	Language     string   `json:"language"`
+	UILanguage   string   `json:"ui_language"`
 }
 
 func (h *authHandler) login(w http.ResponseWriter, r *http.Request) {
@@ -177,6 +179,8 @@ func (h *authHandler) login(w http.ResponseWriter, r *http.Request) {
 			Avatar:       u.Avatar,
 			Roles:        roles,
 			IsSuperAdmin: u.IsSuperAdmin,
+			Language:     u.Language,
+			UILanguage:   u.UILanguage,
 		},
 	})
 }
@@ -274,6 +278,8 @@ func (h *authHandler) acceptInvite(w http.ResponseWriter, r *http.Request) {
 			Avatar:       u.Avatar,
 			Roles:        roles,
 			IsSuperAdmin: u.IsSuperAdmin,
+			Language:     u.Language,
+			UILanguage:   u.UILanguage,
 		},
 	})
 }
@@ -565,6 +571,8 @@ func (h *authHandler) refresh(w http.ResponseWriter, r *http.Request) {
 			Avatar:       u.Avatar,
 			Roles:        roles,
 			IsSuperAdmin: u.IsSuperAdmin,
+			Language:     u.Language,
+			UILanguage:   u.UILanguage,
 		},
 	})
 }
@@ -622,6 +630,8 @@ func (h *authHandler) me(w http.ResponseWriter, r *http.Request) {
 		Avatar:       u.Avatar,
 		Roles:        roles,
 		IsSuperAdmin: u.IsSuperAdmin,
+		Language:     u.Language,
+		UILanguage:   u.UILanguage,
 	})
 }
 

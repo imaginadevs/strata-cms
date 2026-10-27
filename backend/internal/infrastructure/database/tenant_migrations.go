@@ -484,4 +484,12 @@ ALTER TABLE {schema}.workflows ADD COLUMN IF NOT EXISTS origin_plugin TEXT;
 CREATE INDEX IF NOT EXISTS workflows_origin_idx ON {schema}.workflows (origin_plugin);
 `,
 	},
+	{
+		version: 15,
+		sql: `
+-- Separate admin INTERFACE language (distinct from the content ` + "`language`" + ` above).
+-- Empty string means "follow the browser / default".
+ALTER TABLE {schema}.users ADD COLUMN IF NOT EXISTS ui_language VARCHAR(10) NOT NULL DEFAULT '';
+`,
+	},
 }

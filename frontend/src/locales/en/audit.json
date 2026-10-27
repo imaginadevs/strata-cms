@@ -1,0 +1,19 @@
+{
+  "audit": {
+    "title": "Audit Log",
+    "subtitle": "All changes across your CMS",
+    "operation": "Operation",
+    "collection": "Collection",
+    "user": "User",
+    "changedFields": "Changed fields",
+    "date": "Date",
+    "system": "system",
+    "op": {
+      "create": "create",
+      "update": "update",
+      "delete": "delete",
+      "login": "login",
+      "logout": "logout"
+    }
+  }
+}

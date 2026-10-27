@@ -7,7 +7,7 @@
  * (the backend reconciles insert/update/delete in one transaction).
  */
 import { get } from "@/lib/api";
-import type { Relation } from "@/types";
+import type { Field, Relation } from "@/types";
 
 /** A one-to-many relation where a given collection is the parent (one) side. */
 export interface ChildRelation {
@@ -39,6 +39,36 @@ export function childRelationsOf(relations: Relation[], collection: string): Chi
       fkColumn: r.field_many,
       owned: (r.on_delete ?? "").toLowerCase() === "cascade",
     }));
+}
+
+/**
+ * withRelationOptions returns `fields` where each UUID field that is a foreign
+ * key of a relation on `collection` (i.e. a `collection_many === collection`
+ * relation's `field_many`) carries `options.related_collection`, so the field
+ * renders as a relation picker instead of a raw UUID text box. Existing options
+ * (including a configured `display_field`) are preserved; a field that already
+ * has `related_collection` is left untouched. This is what turns a blueprint FK
+ * column like `website_pages_blocks.block_id` into a Blocks picker.
+ */
+export function withRelationOptions(
+  fields: Field[],
+  relations: Relation[],
+  collection: string,
+): Field[] {
+  const fkToOne = new Map<string, string>();
+  for (const r of relations) {
+    if (r.collection_many === collection && !r.junction_table) {
+      fkToOne.set(r.field_many, r.collection_one);
+    }
+  }
+  if (fkToOne.size === 0) return fields;
+  return fields.map((f) => {
+    const relatedCollection = fkToOne.get(f.name);
+    if (!relatedCollection) return f;
+    const opts = (f.options as Record<string, unknown> | undefined) ?? {};
+    if (opts.related_collection) return f;
+    return { ...f, options: { ...opts, related_collection: relatedCollection } };
+  });
 }
 
 /** GET one item with the named child relations expanded inline. */

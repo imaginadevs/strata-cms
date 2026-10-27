@@ -2,6 +2,7 @@
  * Aside panel to create a new section on a collection.
  */
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { createPortal } from "react-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { AnimatePresence, motion } from "framer-motion";
@@ -43,6 +44,7 @@ function AddSectionPanelInner({
   nextSort: number;
   onClose: () => void;
 }) {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [name, setName] = useState("");
   const [displayName, setDisplayName] = useState("");
@@ -72,7 +74,7 @@ function AddSectionPanelInner({
     e.preventDefault();
     const slug = name.trim();
     if (!SNAKE_RE.test(slug)) {
-      setNameError("Use lowercase letters, numbers and underscores. Must start with a letter.");
+      setNameError(t("collections.snakeCaseError"));
       return;
     }
     setNameError(null);
@@ -102,7 +104,7 @@ function AddSectionPanelInner({
           <div className="flex shrink-0 items-center justify-between border-b border-slate-100 dark:border-white/10 px-6 py-5">
             <div>
               <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">
-                Add Section
+                {t("collections.addSection")}
               </h2>
               <p className="mt-0.5 text-xs text-slate-400">{collectionName}</p>
             </div>
@@ -118,7 +120,7 @@ function AddSectionPanelInner({
           <div className="flex-1 space-y-5 overflow-y-auto px-6 py-6">
             <div>
               <label className="mb-1.5 block text-xs font-medium text-slate-700 dark:text-slate-200">
-                Key <span className="text-red-400">*</span>
+                {t("collections.key")} <span className="text-red-400">*</span>
               </label>
               <input
                 className="input font-mono text-sm"
@@ -126,18 +128,18 @@ function AddSectionPanelInner({
                 onChange={(e) => setName(e.target.value)}
                 placeholder="pricing"
               />
-              <p className="mt-1 text-xs text-slate-400">Slug — snake_case, unique in this collection</p>
+              <p className="mt-1 text-xs text-slate-400">{t("collections.slugHint")}</p>
               {nameError && <p className="mt-1 text-xs text-red-500">{nameError}</p>}
             </div>
             <div>
               <label className="mb-1.5 block text-xs font-medium text-slate-700 dark:text-slate-200">
-                Display name
+                {t("collections.displayName")}
               </label>
               <input
                 className="input"
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value)}
-                placeholder="Pricing"
+                placeholder={t("collections.placeholderPricing")}
               />
             </div>
             {mutation.isError && (
@@ -149,10 +151,10 @@ function AddSectionPanelInner({
 
           <div className="flex shrink-0 items-center justify-between border-t border-slate-100 dark:border-white/10 px-6 py-4">
             <Button type="button" variant="ghost" onClick={onClose}>
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button type="submit" disabled={mutation.isPending || !name.trim()}>
-              {mutation.isPending ? "Creating…" : "Create Section"}
+              {mutation.isPending ? t("collections.creating") : t("collections.createSection")}
             </Button>
           </div>
         </form>

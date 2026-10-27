@@ -1,25 +1,34 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { motion } from "framer-motion";
+import { useTranslation } from "react-i18next";
 import { post } from "@/lib/api";
 import { useAuthStore } from "@/store/auth.store";
 import { Button } from "@/components/ui/Button";
 import type { TokenResponse } from "@/types";
 
-const schema = z.object({
-  email: z.string().email("Enter a valid email"),
-  password: z.string().min(1, "Password is required"),
-});
-
-type FormData = z.infer<typeof schema>;
+type FormData = {
+  email: string;
+  password: string;
+};
 
 export default function LoginPage() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { setSession } = useAuthStore();
   const [error, setError] = useState<string | null>(null);
+
+  const schema = useMemo(
+    () =>
+      z.object({
+        email: z.string().email(t("auth.invalidEmail")),
+        password: z.string().min(1, t("auth.passwordRequired")),
+      }),
+    [t],
+  );
 
   const {
     register,
@@ -34,7 +43,7 @@ export default function LoginPage() {
       setSession(response);
       navigate({ to: "/" });
     } catch (err) {
-      setError((err as Error).message ?? "Login failed");
+      setError((err as Error).message ?? t("auth.loginFailed"));
     }
   };
 
@@ -55,8 +64,8 @@ export default function LoginPage() {
               <span className="text-2xl font-bold text-white">C</span>
             </div>
             <div className="text-center">
-              <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100">Welcome back</h1>
-              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Sign in to your account</p>
+              <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100">{t("auth.welcomeBack")}</h1>
+              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{t("auth.signInSubtitle")}</p>
             </div>
           </div>
 
@@ -64,13 +73,13 @@ export default function LoginPage() {
             {/* Email */}
             <div>
               <label className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-200">
-                Email
+                {t("common.email")}
               </label>
               <input
                 {...register("email")}
                 type="email"
                 autoComplete="email"
-                placeholder="you@example.com"
+                placeholder={t("auth.emailPlaceholder")}
                 className="input"
               />
               {errors.email && (
@@ -81,7 +90,7 @@ export default function LoginPage() {
             {/* Password */}
             <div>
               <label className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-200">
-                Password
+                {t("common.password")}
               </label>
               <input
                 {...register("password")}
@@ -103,14 +112,14 @@ export default function LoginPage() {
             )}
 
             <Button type="submit" className="mt-2 w-full" loading={isSubmitting}>
-              Sign in
+              {t("auth.signIn")}
             </Button>
           </form>
 
           {/* SSO divider — shown only when SSO is enabled */}
           <div className="mt-6 flex items-center gap-3">
             <div className="h-px flex-1 bg-slate-200 dark:bg-white/10" />
-            <span className="text-xs text-slate-400">or continue with</span>
+            <span className="text-xs text-slate-400">{t("auth.orContinueWith")}</span>
             <div className="h-px flex-1 bg-slate-200 dark:bg-white/10" />
           </div>
           <a
@@ -119,7 +128,7 @@ export default function LoginPage() {
                        border border-slate-200 dark:border-white/10 bg-white/80 dark:bg-white/5 px-4 py-2.5 text-sm
                        font-medium text-slate-700 dark:text-slate-200 shadow-sm transition hover:shadow"
           >
-            SSO / Logto
+            {t("auth.ssoLogto")}
           </a>
         </div>
       </motion.div>

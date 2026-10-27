@@ -2,6 +2,8 @@
  * Workflow create/edit — n8n-style React Flow canvas + config panel.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 import { Link, useNavigate, useParams } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -25,6 +27,7 @@ import { get, patch, post } from "@/lib/api";
 import { Button } from "@/components/ui/Button";
 import type { Workflow, WorkflowCatalog } from "@/types";
 import { nodeTypes, type WfNode } from "./WorkflowNodes";
+import { actionTypeLabel, triggerTypeLabel } from "./helpers";
 import {
   WorkflowConfigPanel,
   WorkflowMetaBar,
@@ -45,9 +48,14 @@ const ACTION_X0 = 380;
 const ACTION_GAP = 280;
 const NODE_Y = 160;
 
-function buildGraph(draft: WorkflowDraft): { nodes: WfNode[]; edges: Edge[] } {
-  const triggerTitle =
-    draft.trigger.type === "schedule" ? "Schedule" : "Field changed";
+function buildGraph(
+  draft: WorkflowDraft,
+  t: TFunction,
+): { nodes: WfNode[]; edges: Edge[] } {
+  const triggerTitle = triggerTypeLabel(
+    t,
+    draft.trigger.type === "schedule" ? "schedule" : "field_changed",
+  );
 
   const nodes: WfNode[] = [
     {
@@ -58,7 +66,8 @@ function buildGraph(draft: WorkflowDraft): { nodes: WfNode[]; edges: Edge[] } {
       data: {
         kind: "trigger",
         title: triggerTitle,
-        subtitle: triggerSummary(draft.trigger),
+        subtitle: triggerSummary(draft.trigger, t),
+        isSchedule: draft.trigger.type === "schedule",
       },
     },
   ];
@@ -71,8 +80,8 @@ function buildGraph(draft: WorkflowDraft): { nodes: WfNode[]; edges: Edge[] } {
       deletable: draft.actions.length > 1,
       data: {
         kind: "action",
-        title: "Email with PDF",
-        subtitle: actionSummary(a),
+        title: actionTypeLabel(t, "email_with_pdf"),
+        subtitle: actionSummary(a, t),
       },
     });
   });
@@ -94,11 +103,11 @@ function buildGraph(draft: WorkflowDraft): { nodes: WfNode[]; edges: Edge[] } {
 }
 
 /** Stable signature — only rebuild graph when structure/labels change. */
-function draftGraphKey(draft: WorkflowDraft): string {
+function draftGraphKey(draft: WorkflowDraft, t: TFunction): string {
   return [
     draft.trigger.type,
-    triggerSummary(draft.trigger),
-    ...draft.actions.map((a) => `${a.nodeId}:${actionSummary(a)}`),
+    triggerSummary(draft.trigger, t),
+    ...draft.actions.map((a) => `${a.nodeId}:${actionSummary(a, t)}`),
   ].join("|");
 }
 
@@ -115,20 +124,21 @@ function EditorCanvas({
   onDraftChange: (d: WorkflowDraft) => void;
   catalog?: WorkflowCatalog;
 }) {
+  const { t } = useTranslation();
   const { fitView } = useReactFlow();
   const didFit = useRef(false);
   const selectedIdRef = useRef(selectedId);
   selectedIdRef.current = selectedId;
 
-  const graphKey = draftGraphKey(draft);
-  const initial = useMemo(() => buildGraph(draft), []); // eslint-disable-line react-hooks/exhaustive-deps -- seed once
+  const graphKey = draftGraphKey(draft, t);
+  const initial = useMemo(() => buildGraph(draft, t), []); // eslint-disable-line react-hooks/exhaustive-deps -- seed once
   const [nodes, setNodes, onNodesChange] = useNodesState(initial.nodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initial.edges);
 
   // Sync labels / node set when draft structure changes — do NOT overwrite
   // selection from selectedId here in a way that loops with onSelectionChange.
   useEffect(() => {
-    const g = buildGraph(draft);
+    const g = buildGraph(draft, t);
     setNodes((prev) => {
       const pos = new Map(prev.map((n) => [n.id, n.position]));
       const selected = new Map(prev.map((n) => [n.id, !!n.selected]));
@@ -139,7 +149,7 @@ function EditorCanvas({
       }));
     });
     setEdges(g.edges);
-  }, [graphKey, draft, setNodes, setEdges]);
+  }, [graphKey, draft, t, setNodes, setEdges]);
 
   // Palette / panel-driven selection → reflect on canvas nodes (no empty clears).
   useEffect(() => {
@@ -272,7 +282,7 @@ function EditorCanvas({
     <div className="relative h-full min-h-[420px] w-full">
       <div className="absolute left-3 top-3 z-10 flex w-44 flex-col gap-2 rounded-2xl border border-slate-200/80 bg-white/95 p-2 shadow-lg backdrop-blur dark:border-white/10 dark:bg-slate-900/95">
         <p className="px-1 text-[10px] font-semibold uppercase tracking-widest text-slate-400">
-          Add node
+          {t("workflows.editor.addNode")}
         </p>
         <button
           type="button"
@@ -280,7 +290,7 @@ function EditorCanvas({
           className="flex items-center gap-2 rounded-xl border border-amber-200/80 bg-amber-50 px-2.5 py-2 text-left text-xs font-medium text-amber-900 transition hover:bg-amber-100 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100"
         >
           <Zap size={14} />
-          Trigger
+          {t("workflows.trigger")}
         </button>
         <button
           type="button"
@@ -288,11 +298,11 @@ function EditorCanvas({
           className="flex items-center gap-2 rounded-xl border border-brand-200/80 bg-brand-50 px-2.5 py-2 text-left text-xs font-medium text-brand-900 transition hover:bg-brand-100 dark:border-brand-500/30 dark:bg-brand-500/10 dark:text-brand-100"
         >
           <Mail size={14} />
-          Email + PDF
+          {t("workflows.editor.emailPlusPdf")}
         </button>
         {(catalog?.actions?.length ?? 0) > 1 && (
           <p className="px-1 text-[10px] text-slate-400">
-            More action types appear here as they ship.
+            {t("workflows.editor.moreActionTypes")}
           </p>
         )}
         <button
@@ -301,7 +311,7 @@ function EditorCanvas({
           className="flex items-center justify-center gap-1 rounded-xl border border-dashed border-slate-200 px-2 py-1.5 text-[11px] font-medium text-slate-500 hover:bg-slate-50 dark:border-white/10 dark:hover:bg-white/5"
         >
           <Plus size={12} />
-          Add action
+          {t("workflows.editor.addAction")}
         </button>
       </div>
 
@@ -346,6 +356,7 @@ function EditorCanvas({
 }
 
 function WorkflowEditorInner() {
+  const { t } = useTranslation();
   const params = useParams({ strict: false }) as { id?: string };
   const isNew = !params.id || params.id === "new";
   const id = isNew ? undefined : params.id;
@@ -379,8 +390,8 @@ function WorkflowEditorInner() {
 
   const saveMut = useMutation({
     mutationFn: async () => {
-      const body = draftToBody(draft);
-      if (!body.name) throw new Error("Name is required");
+      const body = draftToBody(draft, t);
+      if (!body.name) throw new Error(t("workflows.editor.nameRequired"));
       if (isNew) return post<Workflow>("/workflows", body);
       return patch<Workflow>(`/workflows/${id}`, body);
     },
@@ -394,7 +405,9 @@ function WorkflowEditorInner() {
 
   if (id && (isLoading || !hydrated)) {
     return (
-      <div className="py-16 text-center text-sm text-slate-400">Loading…</div>
+      <div className="py-16 text-center text-sm text-slate-400">
+        {t("common.loading")}
+      </div>
     );
   }
 
@@ -415,7 +428,7 @@ function WorkflowEditorInner() {
           variant="ghost"
           onClick={() => navigate({ to: "/workflows" })}
         >
-          Cancel
+          {t("common.cancel")}
         </Button>
         <Button
           type="button"
@@ -426,10 +439,10 @@ function WorkflowEditorInner() {
           }}
         >
           {saveMut.isPending
-            ? "Saving…"
+            ? t("common.saving")
             : isNew
-              ? "Create workflow"
-              : "Save changes"}
+              ? t("workflows.editor.createWorkflow")
+              : t("workflows.editor.saveChanges")}
         </Button>
       </div>
 

@@ -19,6 +19,10 @@ type Tenant struct {
 	PrimaryColor     *string   `json:"primary_color"     db:"primary_color"`
 	Domain           *string   `json:"domain,omitempty"  db:"domain"`
 	Active           bool      `json:"active"            db:"active"`
+	// IsPlatform marks the single platform ("first") tenant that owns the
+	// super-admin account used to manage all other tenants. Managed by
+	// bootstrap/migrations, not editable through the normal tenant update API.
+	IsPlatform       bool      `json:"is_platform"       db:"is_platform"`
 	Settings         Settings  `json:"settings"          db:"settings"`
 	StorageUsedBytes int64     `json:"storage_used_bytes" db:"storage_used_bytes"`
 	// StorageQuotaBytes = 0 means unlimited.

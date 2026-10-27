@@ -1,3 +1,4 @@
+import type { TFunction } from "i18next";
 import type {
   EmailWithPdfActionConfig,
   FieldChangedTriggerConfig,
@@ -143,7 +144,10 @@ export function workflowToDraft(wf: Workflow): WorkflowDraft {
   };
 }
 
-export function draftToBody(draft: WorkflowDraft): WorkflowWriteBody {
+export function draftToBody(
+  draft: WorkflowDraft,
+  tf: TFunction,
+): WorkflowWriteBody {
   const t = draft.trigger;
   let triggerConfig: Record<string, unknown>;
 
@@ -172,7 +176,7 @@ export function draftToBody(draft: WorkflowDraft): WorkflowWriteBody {
   }
 
   if (draft.actions.length === 0) {
-    throw new Error("Add at least one action");
+    throw new Error(tf("workflows.editor.addAtLeastOneAction"));
   }
 
   const actions = draft.actions.map((a) => {
@@ -205,21 +209,23 @@ export function draftToBody(draft: WorkflowDraft): WorkflowWriteBody {
   };
 }
 
-export function triggerSummary(t: TriggerDraft): string {
-  if (!t.collection) return "Choose a collection";
+export function triggerSummary(t: TriggerDraft, tf: TFunction): string {
+  if (!t.collection) return tf("workflows.summary.chooseCollection");
   if (t.type === "field_changed") {
-    if (!t.field) return `${t.collection} · pick a field`;
+    if (!t.field) {
+      return `${t.collection} · ${tf("workflows.summary.pickField")}`;
+    }
     return `${t.collection}.${t.field} → ${t.to || "…"}`;
   }
   if (t.scheduleMode === "basic") {
-    return `${t.collection} · ${describeBasic(t.basic)}`;
+    return `${t.collection} · ${describeBasic(t.basic, tf)}`;
   }
   return `${t.collection} · ${t.cron}`;
 }
 
-export function actionSummary(a: ActionDraft): string {
+export function actionSummary(a: ActionDraft, tf: TFunction): string {
   if (a.type === "email_with_pdf") {
-    return a.toEmail || a.subject || "Configure email + PDF";
+    return a.toEmail || a.subject || tf("workflows.summary.configureEmailPdf");
   }
   return a.type;
 }

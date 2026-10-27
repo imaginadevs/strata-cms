@@ -2,6 +2,7 @@
  * Workflows list — name, active toggle, trigger type, last fired.
  */
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import * as Switch from "@radix-ui/react-switch";
@@ -14,6 +15,7 @@ import type { PaginatedResponse, Workflow as Wf } from "@/types";
 import { ActiveDot, triggerTypeLabel } from "./helpers";
 
 export default function WorkflowsPage() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -51,15 +53,15 @@ export default function WorkflowsPage() {
       <div className="flex items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">
-            Workflows
+            {t("workflows.title")}
           </h1>
           <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-            Automations that run when a field changes or on a schedule.
+            {t("workflows.subtitle")}
           </p>
         </div>
         <Button type="button" onClick={() => navigate({ to: "/workflows/new" })}>
           <Plus size={16} />
-          New workflow
+          {t("workflows.newWorkflow")}
         </Button>
       </div>
 
@@ -67,10 +69,10 @@ export default function WorkflowsPage() {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-slate-100 text-left text-xs font-medium text-slate-500 dark:border-white/10 dark:text-slate-400">
-              <th className="px-5 py-3">Name</th>
-              <th className="px-5 py-3">Trigger</th>
-              <th className="px-5 py-3">Active</th>
-              <th className="px-5 py-3">Last fired</th>
+              <th className="px-5 py-3">{t("common.name")}</th>
+              <th className="px-5 py-3">{t("workflows.trigger")}</th>
+              <th className="px-5 py-3">{t("common.active")}</th>
+              <th className="px-5 py-3">{t("workflows.lastFired")}</th>
               <th className="w-40 px-5 py-3" />
             </tr>
           </thead>
@@ -78,7 +80,7 @@ export default function WorkflowsPage() {
             {isLoading && (
               <tr>
                 <td colSpan={5} className="py-12 text-center text-slate-400">
-                  Loading…
+                  {t("common.loading")}
                 </td>
               </tr>
             )}
@@ -90,10 +92,10 @@ export default function WorkflowsPage() {
                       <Workflow size={18} />
                     </div>
                     <p className="text-sm font-medium text-slate-700 dark:text-slate-200">
-                      No workflows yet
+                      {t("workflows.noWorkflowsYet")}
                     </p>
                     <p className="text-xs text-slate-400">
-                      Create one to automate your workflows.
+                      {t("workflows.noWorkflowsHint")}
                     </p>
                     <Button
                       type="button"
@@ -102,7 +104,7 @@ export default function WorkflowsPage() {
                       onClick={() => navigate({ to: "/workflows/new" })}
                     >
                       <Plus size={14} />
-                      New workflow
+                      {t("workflows.newWorkflow")}
                     </Button>
                   </div>
                 </td>
@@ -132,7 +134,7 @@ export default function WorkflowsPage() {
                 </td>
                 <td className="px-5 py-3">
                   <span className="badge badge-gray">
-                    {triggerTypeLabel(wf.trigger.type)}
+                    {triggerTypeLabel(t, wf.trigger.type)}
                   </span>
                 </td>
                 <td className="px-5 py-3">
@@ -149,7 +151,11 @@ export default function WorkflowsPage() {
                         ? "bg-brand-600"
                         : "bg-slate-200 dark:bg-white/15"
                     }`}
-                    aria-label={wf.active ? "Deactivate" : "Activate"}
+                    aria-label={
+                      wf.active
+                        ? t("workflows.deactivate")
+                        : t("workflows.activate")
+                    }
                   >
                     <Switch.Thumb
                       className={`block h-3.5 w-3.5 rounded-full bg-white shadow-sm transition-transform ${
@@ -173,7 +179,7 @@ export default function WorkflowsPage() {
                           params: { id: wf.id },
                         })
                       }
-                      title="Run history"
+                      title={t("workflows.runHistory")}
                     >
                       <History size={14} />
                     </Button>
@@ -187,7 +193,7 @@ export default function WorkflowsPage() {
                           params: { id: wf.id },
                         })
                       }
-                      title="Edit"
+                      title={t("common.edit")}
                     >
                       <Pencil size={14} />
                     </Button>
@@ -200,7 +206,7 @@ export default function WorkflowsPage() {
                       onClick={() => {
                         if (
                           !window.confirm(
-                            `Delete workflow “${wf.name}”? This cannot be undone.`,
+                            t("workflows.confirmDelete", { name: wf.name }),
                           )
                         ) {
                           return;
@@ -208,7 +214,7 @@ export default function WorkflowsPage() {
                         setDeletingId(wf.id);
                         deleteMut.mutate(wf.id);
                       }}
-                      title="Delete"
+                      title={t("common.delete")}
                     >
                       <Trash2 size={14} />
                     </Button>

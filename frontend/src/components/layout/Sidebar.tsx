@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useRouterState } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   LayoutDashboard,
@@ -23,8 +24,8 @@ import {
   KeyRound,
 } from "lucide-react";
 import { StrataMark } from "@/components/ui/StrataMark";
+import { useSuperStatus } from "@/lib/super";
 import { useTenantStore } from "@/store/tenant.store";
-import { useAuthStore } from "@/store/auth.store";
 import { useUIStore } from "@/store/ui.store";
 import { get } from "@/lib/api";
 import type { Collection, CollectionGroup, PaginatedResponse } from "@/types";
@@ -186,6 +187,7 @@ function GroupSection({
 
 // ── Content-mode nav ──────────────────────────────────────────────────────────
 function ContentNav() {
+  const { t } = useTranslation();
   const { data: collections = [], isLoading } = useQuery({
     queryKey: ["collections"],
     queryFn: () =>
@@ -224,10 +226,10 @@ function ContentNav() {
       {/* BI */}
       <div>
         <p className="mb-1 px-3 text-[10px] font-semibold uppercase tracking-widest text-slate-400">
-          BI
+          {t("shell.bi")}
         </p>
         <ul className="space-y-0.5">
-          <NavItem to="/" label="Dashboard" icon={LayoutDashboard} exact />
+          <NavItem to="/" label={t("shell.dashboard")} icon={LayoutDashboard} exact />
         </ul>
       </div>
 
@@ -235,15 +237,15 @@ function ContentNav() {
       <div className="pt-3">
         <div className="mb-1 flex items-center justify-between px-3">
           <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400">
-            Content
+            {t("shell.content")}
           </p>
           <Link
             to="/content"
             className="flex items-center gap-1 text-[10px] font-medium text-slate-400 transition hover:text-brand-600 dark:hover:text-brand-300"
-            title="Browse all collections"
+            title={t("shell.browseAll")}
           >
             <LayoutGrid size={11} />
-            All
+            {t("shell.all")}
           </Link>
         </div>
         {visible.length > 6 && (
@@ -252,7 +254,7 @@ function ContentNav() {
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Find a collection…"
+              placeholder={t("shell.findCollection")}
               className="w-full bg-transparent text-xs text-slate-700 placeholder:text-slate-400 focus:outline-none dark:text-slate-200"
             />
           </div>
@@ -292,7 +294,7 @@ function ContentNav() {
         <div className="pt-2">
           {sortedGroups.length > 0 && (
             <p className="mb-1 px-3 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
-              Ungrouped
+              {t("shell.ungrouped")}
             </p>
           )}
           <ul className="space-y-0.5">
@@ -305,16 +307,16 @@ function ContentNav() {
 
       {/* Empty search result */}
       {q && ungrouped.length === 0 && sortedGroups.every((g) => inGroup(g.id).length === 0) && (
-        <p className="px-3 pt-2 text-xs text-slate-400">No collections match “{query}”.</p>
+        <p className="px-3 pt-2 text-xs text-slate-400">{t("shell.noCollectionsMatch", { query })}</p>
       )}
 
       {/* Automations */}
       <div className="pt-3">
         <p className="mb-1 px-3 text-[10px] font-semibold uppercase tracking-widest text-slate-400">
-          Automations
+          {t("shell.automations")}
         </p>
         <ul className="space-y-0.5">
-          <NavItem to="/workflows" label="Workflows" icon={Workflow} />
+          <NavItem to="/workflows" label={t("shell.workflows")} icon={Workflow} />
         </ul>
       </div>
     </nav>
@@ -323,23 +325,27 @@ function ContentNav() {
 
 // ── Settings-mode nav ─────────────────────────────────────────────────────────
 const SETTINGS_NAV = [
-  { to: "/collections",  label: "Collections",   icon: Database },
-  { to: "/users",        label: "Users",          icon: Users },
-  { to: "/roles",        label: "Roles",          icon: Shield },
-  { to: "/api-tokens",   label: "API Tokens",     icon: KeyRound },
-  { to: "/audit",        label: "Audit Logs",     icon: ScrollText },
-  { to: "/settings",     label: "Configuration",  icon: SlidersHorizontal },
+  { to: "/collections",  labelKey: "shell.collections",  icon: Database },
+  { to: "/users",        labelKey: "shell.users",        icon: Users },
+  { to: "/roles",        labelKey: "shell.roles",        icon: Shield },
+  { to: "/api-tokens",   labelKey: "shell.apiTokens",    icon: KeyRound },
+  { to: "/audit",        labelKey: "shell.auditLogs",    icon: ScrollText },
+  { to: "/settings",     labelKey: "shell.configuration", icon: SlidersHorizontal },
 ] as const;
 
 function SettingsNav() {
-  const user = useAuthStore((s) => s.user);
-  const isSuper = !!user?.is_super_admin || !!user?.roles?.includes("super_admin");
+  const { t } = useTranslation();
+  // Use the *effective* super-admin status (claim + allowed IP), not the raw
+  // token claim — tenant management only works from an allowed IP, so offering
+  // it otherwise just leads to a 403.
+  const { data: superStatus } = useSuperStatus();
+  const isSuper = !!superStatus?.active;
 
   // Tenants management is super-admin only; insert it after Users.
   const items = isSuper
     ? [
         ...SETTINGS_NAV.slice(0, 2),
-        { to: "/tenants", label: "Tenants", icon: Building2 } as const,
+        { to: "/tenants", labelKey: "shell.tenants", icon: Building2 } as const,
         ...SETTINGS_NAV.slice(2),
       ]
     : SETTINGS_NAV;
@@ -353,15 +359,15 @@ function SettingsNav() {
                    text-sm font-medium text-slate-500 transition hover:bg-slate-100/70 dark:text-slate-400 dark:hover:bg-white/5 hover:text-slate-800 dark:hover:text-slate-100"
       >
         <ChevronLeft size={16} />
-        Content
+        {t("shell.backToContent")}
       </Link>
 
       <p className="mb-1 px-3 text-[10px] font-semibold uppercase tracking-widest text-slate-400">
-        Settings
+        {t("shell.settings")}
       </p>
       <ul className="space-y-0.5">
-        {items.map(({ to, label, icon }) => (
-          <NavItem key={to} to={to} label={label} icon={icon} />
+        {items.map(({ to, labelKey, icon }) => (
+          <NavItem key={to} to={to} label={t(labelKey)} icon={icon} />
         ))}
       </ul>
     </nav>
@@ -370,6 +376,7 @@ function SettingsNav() {
 
 // ── Sidebar ───────────────────────────────────────────────────────────────────
 export function Sidebar() {
+  const { t } = useTranslation();
   const { tenant } = useTenantStore();
   const { sidebarOpen, closeSidebar } = useUIStore();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
@@ -403,9 +410,9 @@ export function Sidebar() {
         </div>
         <div className="flex min-w-0 flex-col leading-tight">
           <span className="truncate text-sm font-bold text-slate-800 dark:text-slate-100 tracking-tight">
-            {tenant?.name ?? "Workspace"}
+            {tenant?.name ?? t("shell.workspace")}
           </span>
-          <span className="text-[11px] font-medium text-slate-400">Admin</span>
+          <span className="text-[11px] font-medium text-slate-400">{t("shell.admin")}</span>
         </div>
       </div>
 
@@ -452,7 +459,7 @@ export function Sidebar() {
             >
               <Settings size={15} strokeWidth={1.8} />
             </div>
-            <span className="text-sm font-medium text-slate-600 dark:text-slate-300">Settings</span>
+            <span className="text-sm font-medium text-slate-600 dark:text-slate-300">{t("shell.settings")}</span>
             <Plus size={12} className="ml-auto text-slate-300" />
           </Link>
         ) : (
@@ -476,7 +483,7 @@ export function Sidebar() {
         >
           <StrataMark className="h-3 w-3" />
           <span>
-            Made with <span className="font-semibold">Strata</span> · Imagina
+            {t("shell.madeWith")} <span className="font-semibold">Strata</span> · Imagina
           </span>
         </a>
       </div>

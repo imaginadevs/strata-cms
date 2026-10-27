@@ -3,6 +3,7 @@
  * or delete the section (reassigning fields when needed).
  */
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { createPortal } from "react-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { AnimatePresence, motion } from "framer-motion";
@@ -62,6 +63,7 @@ function EditSectionPanelInner({
   collectionFields: Field[];
   onClose: () => void;
 }) {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [displayName, setDisplayName] = useState(section.display_name);
   const [note, setNote] = useState(section.note ?? "");
@@ -170,7 +172,7 @@ function EditSectionPanelInner({
           <div className="flex shrink-0 items-center justify-between border-b border-slate-100 dark:border-white/10 px-6 py-5">
             <div>
               <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">
-                Edit Section
+                {t("collections.editSection")}
               </h2>
               <p className="mt-0.5 font-mono text-xs text-slate-400">{section.name}</p>
             </div>
@@ -188,26 +190,26 @@ function EditSectionPanelInner({
               <>
                 <div>
                   <label className="mb-1.5 block text-xs font-medium text-slate-700 dark:text-slate-200">
-                    Display name
+                    {t("collections.displayName")}
                   </label>
                   <input
                     className="input"
                     value={displayName}
                     onChange={(e) => setDisplayName(e.target.value)}
-                    placeholder="General"
+                    placeholder={t("collections.placeholderGeneral")}
                   />
                 </div>
 
                 <div>
                   <label className="mb-1.5 block text-xs font-medium text-slate-700 dark:text-slate-200">
-                    Note
+                    {t("collections.note")}
                   </label>
                   <textarea
                     className="input resize-none"
                     rows={2}
                     value={note}
                     onChange={(e) => setNote(e.target.value)}
-                    placeholder="Optional helper text for editors…"
+                    placeholder={t("collections.noteHelperPlaceholder")}
                   />
                 </div>
 
@@ -221,23 +223,23 @@ function EditSectionPanelInner({
               <div className="space-y-4">
                 <div className="rounded-xl border border-red-100 dark:border-red-500/20 bg-red-50/80 dark:bg-red-500/10 px-4 py-3">
                   <p className="text-sm font-medium text-red-700 dark:text-red-300">
-                    Delete “{section.display_name}”?
+                    {t("collections.deleteSectionTitle", { name: section.display_name })}
                   </p>
                   <p className="mt-1 text-xs text-red-600/80 dark:text-red-400/80">
                     {fieldCount > 0
-                      ? `This section has ${fieldCount} field${fieldCount !== 1 ? "s" : ""}. Choose where to move them before deleting.`
-                      : "This section has no fields and will be removed."}
+                      ? t("collections.deleteSectionWithFields", { count: fieldCount })
+                      : t("collections.deleteSectionEmpty")}
                   </p>
                 </div>
 
                 {fieldCount > 0 && (
                   <div>
                     <label className="mb-1.5 block text-xs font-medium text-slate-700 dark:text-slate-200">
-                      Move fields to
+                      {t("collections.moveFieldsTo")}
                     </label>
                     <Select.Root value={reassignTo} onValueChange={setReassignTo}>
                       <Select.Trigger className="flex h-10 w-full items-center justify-between rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 text-sm text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-100 dark:focus:ring-brand-500/20">
-                        <Select.Value placeholder="Select section" />
+                        <Select.Value placeholder={t("collections.selectSection")} />
                         <Select.Icon>
                           <ChevronDown size={14} className="text-slate-400" />
                         </Select.Icon>
@@ -284,8 +286,8 @@ function EditSectionPanelInner({
                   onClick={() => setConfirmDelete(true)}
                   title={
                     canDelete
-                      ? "Delete section"
-                      : "At least one section must remain"
+                      ? t("collections.deleteSection")
+                      : t("collections.minOneSection")
                   }
                   className={
                     canDelete
@@ -294,14 +296,14 @@ function EditSectionPanelInner({
                   }
                 >
                   <Trash2 size={14} />
-                  Delete
+                  {t("common.delete")}
                 </Button>
                 <div className="flex items-center gap-2">
                   <Button type="button" variant="ghost" onClick={onClose}>
-                    Cancel
+                    {t("common.cancel")}
                   </Button>
                   <Button type="submit" disabled={busy || !displayName.trim()}>
-                    {mutation.isPending ? "Saving…" : "Save Section"}
+                    {mutation.isPending ? t("common.saving") : t("collections.saveSection")}
                   </Button>
                 </div>
               </>
@@ -313,7 +315,7 @@ function EditSectionPanelInner({
                   disabled={busy}
                   onClick={() => setConfirmDelete(false)}
                 >
-                  Back
+                  {t("common.back")}
                 </Button>
                 <Button
                   type="button"
@@ -322,7 +324,7 @@ function EditSectionPanelInner({
                   onClick={() => deleteMutation.mutate()}
                 >
                   <Trash2 size={14} />
-                  {deleteMutation.isPending ? "Deleting…" : "Delete section"}
+                  {deleteMutation.isPending ? t("common.deleting") : t("collections.deleteSection")}
                 </Button>
               </>
             )}

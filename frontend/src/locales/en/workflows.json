@@ -1,0 +1,128 @@
+{
+  "workflows": {
+    "title": "Workflows",
+    "subtitle": "Automations that run when a field changes or on a schedule.",
+    "newWorkflow": "New workflow",
+    "trigger": "Trigger",
+    "action": "Action",
+    "lastFired": "Last fired",
+    "runHistory": "Run history",
+    "noWorkflowsYet": "No workflows yet",
+    "noWorkflowsHint": "Create one to automate your workflows.",
+    "activate": "Activate",
+    "deactivate": "Deactivate",
+    "inactive": "Inactive",
+    "confirmDelete": "Delete workflow “{{name}}”? This cannot be undone.",
+    "triggerTypes": {
+      "field_changed": "Field changed",
+      "schedule": "Schedule"
+    },
+    "actionTypes": {
+      "email_with_pdf": "Email with PDF"
+    },
+    "runStatus": {
+      "pending": "Pending",
+      "running": "Running",
+      "success": "Success",
+      "failed": "Failed",
+      "skipped": "Skipped"
+    },
+    "editor": {
+      "addNode": "Add node",
+      "emailPlusPdf": "Email + PDF",
+      "moreActionTypes": "More action types appear here as they ship.",
+      "addAction": "Add action",
+      "createWorkflow": "Create workflow",
+      "saveChanges": "Save changes",
+      "nameRequired": "Name is required",
+      "addAtLeastOneAction": "Add at least one action",
+      "workflowName": "Workflow name",
+      "configureSelectedNode": "Configure the selected node",
+      "nodeNotFound": "Node not found"
+    },
+    "summary": {
+      "chooseCollection": "Choose a collection",
+      "pickField": "pick a field",
+      "configureEmailPdf": "Configure email + PDF"
+    },
+    "runs": {
+      "refresh": "Refresh",
+      "editWorkflow": "Edit workflow",
+      "collectionItem": "Collection / item",
+      "started": "Started",
+      "finished": "Finished",
+      "error": "Error",
+      "noRuns": "No runs yet",
+      "runDetail": "Run detail",
+      "collection": "Collection",
+      "item": "Item",
+      "steps": "Steps",
+      "noSteps": "No steps"
+    },
+    "config": {
+      "onlyIncludeWhere": "Only include items where",
+      "equalityMatch": "Equality match · one run per item each tick",
+      "condition": "Condition",
+      "noFilter": "No filter — all items (up to max) are processed.",
+      "fieldEllipsis": "Field…",
+      "equals": "equals",
+      "valuePlaceholder": "value",
+      "atMinute": "At minute",
+      "hour": "Hour",
+      "minute": "Minute",
+      "dayOfMonth": "Day of month",
+      "selectCollection": "Select collection…",
+      "triggerType": "Trigger type",
+      "collection": "Collection",
+      "field": "Field",
+      "selectField": "Select field…",
+      "changesTo": "Changes to",
+      "fromOptional": "From (optional)",
+      "schedule": "Schedule",
+      "cron": "Cron",
+      "timezone": "Timezone",
+      "maxItems": "Max items per run",
+      "maxItemsHint": "Cap matching items each tick (default 50, max 200).",
+      "to": "To",
+      "cc": "Cc",
+      "subject": "Subject",
+      "body": "Body",
+      "pdfTemplate": "PDF template",
+      "pdfFilename": "PDF filename"
+    },
+    "schedule": {
+      "mode": {
+        "basic": "Basic",
+        "advanced": "Advanced"
+      },
+      "frequency": {
+        "hourly": "Hourly",
+        "daily": "Daily",
+        "weekly": "Weekly",
+        "monthly": "Monthly"
+      },
+      "describeHourly": "Every hour at minute {{minute}}",
+      "describeDaily": "Every day at {{time}}",
+      "describeWeekly": "Weekly on {{days}} at {{time}}",
+      "describeMonthly": "Monthly on day {{day}} at {{time}}"
+    },
+    "weekday": {
+      "mon": "Monday",
+      "tue": "Tuesday",
+      "wed": "Wednesday",
+      "thu": "Thursday",
+      "fri": "Friday",
+      "sat": "Saturday",
+      "sun": "Sunday"
+    },
+    "weekdayShort": {
+      "mon": "Mon",
+      "tue": "Tue",
+      "wed": "Wed",
+      "thu": "Thu",
+      "fri": "Fri",
+      "sat": "Sat",
+      "sun": "Sun"
+    }
+  }
+}

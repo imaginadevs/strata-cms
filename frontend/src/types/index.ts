@@ -17,6 +17,8 @@ export interface Tenant {
   primary_color: string | null;
   domain: string | null;
   active: boolean;
+  /** The platform ("first") tenant that owns the super-admin account. */
+  is_platform?: boolean;
   settings: TenantSettings;
 }
 
@@ -95,6 +97,24 @@ export interface PluginInstallResponse {
   plugins: Plugin[];
 }
 
+// ── Super admin ─────────────────────────────────────────────────────────────
+/** Effective super-admin status for the current request, from
+ *  GET /api/super-admin/status. `active` is the authoritative flag the backend
+ *  enforces on tenant management: the account is a super admin AND the request
+ *  comes from an allowed IP. The UI shows tenant management only when `active`. */
+export interface SuperStatus {
+  /** The account is flagged super admin (token claim) — may still be inactive. */
+  is_super_admin: boolean;
+  /** Super-admin privilege is in effect (claim + allowed IP). */
+  active: boolean;
+  /** The source IP the server saw for this request. */
+  client_ip: string;
+  /** Whether SUPER_ADMIN_ALLOWED_IPS is set in the environment at all. */
+  allowlist_configured: boolean;
+  /** The configured allowlist — only returned when `active` is true. */
+  allowed_ips?: string[];
+}
+
 // ── Auth ──────────────────────────────────────────────────────────────────────
 export interface AuthUser {
   id: string;
@@ -102,7 +122,10 @@ export interface AuthUser {
   first_name: string;
   last_name: string;
   avatar: string | null;
+  /** Preferred content language (which content translation to author/view). */
   language?: string;
+  /** Preferred admin interface language (drives the UI translations). */
+  ui_language?: string;
   roles: string[];
   is_super_admin?: boolean;
 }
@@ -258,6 +281,7 @@ export interface User extends BaseEntity {
   provider: AuthProvider;
   last_login: string | null;
   language: string;
+  ui_language?: string;
   roles?: Role[];
 }
 

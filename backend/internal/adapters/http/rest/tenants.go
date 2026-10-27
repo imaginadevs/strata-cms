@@ -287,6 +287,13 @@ func (h *tenantHandler) delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// The platform tenant owns the super-admin account — deleting it would lock
+	// everyone out of tenant management, so it is protected.
+	if t, err := h.repos.Tenant.GetByID(r.Context(), id); err == nil && t != nil && t.IsPlatform {
+		writeError(w, http.StatusBadRequest, "the platform tenant cannot be deleted")
+		return
+	}
+
 	if err := h.repos.Tenant.Delete(r.Context(), id); err != nil {
 		writeError(w, http.StatusInternalServerError, "delete failed")
 		return

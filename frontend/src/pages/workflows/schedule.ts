@@ -1,4 +1,5 @@
 /** Basic schedule UI ↔ 5-field cron (min hour dom month dow). */
+import type { TFunction } from "i18next";
 
 export type ScheduleFrequency = "hourly" | "daily" | "weekly" | "monthly";
 
@@ -10,14 +11,15 @@ export type BasicSchedule = {
   monthDay: number; // 1–31
 };
 
+/** `label` / `short` are i18n keys — resolve with t() at the render site. */
 export const WEEKDAYS: { value: number; label: string; short: string }[] = [
-  { value: 1, label: "Monday", short: "Mon" },
-  { value: 2, label: "Tuesday", short: "Tue" },
-  { value: 3, label: "Wednesday", short: "Wed" },
-  { value: 4, label: "Thursday", short: "Thu" },
-  { value: 5, label: "Friday", short: "Fri" },
-  { value: 6, label: "Saturday", short: "Sat" },
-  { value: 0, label: "Sunday", short: "Sun" },
+  { value: 1, label: "workflows.weekday.mon", short: "workflows.weekdayShort.mon" },
+  { value: 2, label: "workflows.weekday.tue", short: "workflows.weekdayShort.tue" },
+  { value: 3, label: "workflows.weekday.wed", short: "workflows.weekdayShort.wed" },
+  { value: 4, label: "workflows.weekday.thu", short: "workflows.weekdayShort.thu" },
+  { value: 5, label: "workflows.weekday.fri", short: "workflows.weekdayShort.fri" },
+  { value: 6, label: "workflows.weekday.sat", short: "workflows.weekdayShort.sat" },
+  { value: 0, label: "workflows.weekday.sun", short: "workflows.weekdayShort.sun" },
 ];
 
 export const DEFAULT_BASIC: BasicSchedule = {
@@ -150,22 +152,28 @@ export function cronToBasic(cron: string): BasicSchedule | null {
   return null;
 }
 
-export function describeBasic(b: BasicSchedule): string {
+export function describeBasic(b: BasicSchedule, t: TFunction): string {
   const pad = (n: number) => String(n).padStart(2, "0");
   const time = `${pad(b.hour)}:${pad(b.minute)}`;
   switch (b.frequency) {
     case "hourly":
-      return `Every hour at minute ${pad(b.minute)}`;
+      return t("workflows.schedule.describeHourly", { minute: pad(b.minute) });
     case "daily":
-      return `Every day at ${time}`;
+      return t("workflows.schedule.describeDaily", { time });
     case "weekly": {
       const labels = WEEKDAYS.filter((d) => b.weekdays.includes(d.value))
-        .map((d) => d.short)
+        .map((d) => t(d.short))
         .join(", ");
-      return `Weekly on ${labels || "—"} at ${time}`;
+      return t("workflows.schedule.describeWeekly", {
+        days: labels || "—",
+        time,
+      });
     }
     case "monthly":
-      return `Monthly on day ${b.monthDay} at ${time}`;
+      return t("workflows.schedule.describeMonthly", {
+        day: b.monthDay,
+        time,
+      });
     default:
       return "";
   }

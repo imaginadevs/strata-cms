@@ -8,11 +8,75 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, X, Pencil, Trash2, Building2, Globe, AlertTriangle } from "lucide-react";
+import { useTranslation, Trans } from "react-i18next";
+import { Plus, X, Pencil, Trash2, Building2, Globe, AlertTriangle, ShieldCheck, ShieldAlert } from "lucide-react";
 import { get, post, patch, del } from "@/lib/api";
 import { Button } from "@/components/ui/Button";
-import { useAuthStore } from "@/store/auth.store";
-import type { Tenant, PaginatedResponse } from "@/types";
+import { useSuperStatus } from "@/lib/super";
+import type { Tenant, PaginatedResponse, SuperStatus } from "@/types";
+
+/**
+ * Super-admin access panel. The IP allowlist that gates tenant management is
+ * configured in the environment (SUPER_ADMIN_ALLOWED_IPS) and is never editable
+ * through the API, so this surfaces it read-only: whether super-admin mode is
+ * active, the IP the server sees, and the configured allowlist when active.
+ */
+function SuperAccessCard({ status }: { status: SuperStatus }) {
+  const { t } = useTranslation();
+  const active = status.active;
+  return (
+    <div
+      className={`mb-6 rounded-2xl border p-4 sm:p-5 ${
+        active
+          ? "border-emerald-200 bg-emerald-50/60 dark:border-emerald-500/25 dark:bg-emerald-500/10"
+          : "border-amber-200 bg-amber-50/60 dark:border-amber-500/25 dark:bg-amber-500/10"
+      }`}
+    >
+      <div className="flex items-start gap-3">
+        {active ? (
+          <ShieldCheck className="mt-0.5 shrink-0 text-emerald-600 dark:text-emerald-400" size={20} />
+        ) : (
+          <ShieldAlert className="mt-0.5 shrink-0 text-amber-600 dark:text-amber-400" size={20} />
+        )}
+        <div className="min-w-0 flex-1">
+          <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-100">
+            {active ? t("tenants.superActive") : t("tenants.superInactive")}
+          </h2>
+          <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
+            <Trans
+              i18nKey="tenants.superRestricted"
+              values={{ ip: status.client_ip || t("tenants.unknown") }}
+              components={{
+                code: <code className="rounded bg-black/5 px-1.5 py-0.5 font-mono text-[12px] dark:bg-white/10" />,
+              }}
+            />
+          </p>
+          {active && status.allowed_ips && status.allowed_ips.length > 0 && (
+            <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+              {t("tenants.allowed")}{" "}
+              {status.allowed_ips.map((ip) => (
+                <code
+                  key={ip}
+                  className="mr-1.5 rounded bg-black/5 px-1.5 py-0.5 font-mono text-[11px] dark:bg-white/10"
+                >
+                  {ip}
+                </code>
+              ))}
+            </p>
+          )}
+          {!active && (
+            <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+              <Trans
+                i18nKey="tenants.superAllowlistNote"
+                components={{ mono: <code className="font-mono" /> }}
+              />
+            </p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function slugify(s: string) {
   return s
@@ -24,8 +88,11 @@ function slugify(s: string) {
 }
 
 export default function TenantsPage() {
-  const user = useAuthStore((s) => s.user);
-  const isSuper = !!user?.is_super_admin || !!user?.roles?.includes("super_admin");
+  const { t } = useTranslation();
+  // Gate on the *effective* status (claim + allowed IP) the backend enforces,
+  // not the raw token claim — otherwise the UI offers actions the API 403s.
+  const { data: superStatus } = useSuperStatus();
+  const isSuper = !!superStatus?.active;
   const qc = useQueryClient();
 
   const [panelOpen, setPanelOpen] = useState(false);
@@ -35,6 +102,7 @@ export default function TenantsPage() {
   const { data: tenants = [], isLoading } = useQuery({
     queryKey: ["tenants"],
     queryFn: () => get<PaginatedResponse<Tenant>>("/tenants").then((r) => r.data ?? []),
+    enabled: isSuper,
   });
 
   const deleteMut = useMutation({
@@ -46,30 +114,38 @@ export default function TenantsPage() {
   });
 
   if (!isSuper) {
+    // Not elevated. If the account is a super admin on a disallowed IP, explain
+    // the IP gate; otherwise it's simply not a super-admin account.
     return (
-      <div className="mx-auto max-w-2xl px-6 py-16 text-center">
-        <AlertTriangle className="mx-auto mb-3 text-amber-400" size={28} />
-        <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-100">Super-admin only</h1>
-        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-          Managing tenants requires a super-admin account. To change your own tenant's branding
-          or plugins, use Settings.
-        </p>
+      <div className="mx-auto max-w-2xl px-4 py-10 sm:px-6">
+        {superStatus?.is_super_admin ? (
+          <SuperAccessCard status={superStatus} />
+        ) : (
+          <div className="py-10 text-center">
+            <AlertTriangle className="mx-auto mb-3 text-amber-400" size={28} />
+            <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-100">{t("tenants.superOnlyTitle")}</h1>
+            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+              {t("tenants.superOnlyDesc")}
+            </p>
+          </div>
+        )}
       </div>
     );
   }
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-6 sm:px-6">
+      {superStatus && <SuperAccessCard status={superStatus} />}
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100">Tenants</h1>
+          <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100">{t("tenants.title")}</h1>
           <p className="text-sm text-slate-400">
-            {tenants.length} tenant{tenants.length === 1 ? "" : "s"}
+            {t("tenants.count", { count: tenants.length })}
           </p>
         </div>
         <Button onClick={() => { setEditing(null); setPanelOpen(true); }}>
           <Plus size={15} className="mr-1.5" />
-          New tenant
+          {t("tenants.newTenant")}
         </Button>
       </div>
 
@@ -77,65 +153,75 @@ export default function TenantsPage() {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-slate-100 text-left text-xs uppercase tracking-wide text-slate-400 dark:border-white/10">
-              <th className="px-4 py-3 font-semibold">Name</th>
-              <th className="px-4 py-3 font-semibold">Slug</th>
-              <th className="px-4 py-3 font-semibold">Domain</th>
-              <th className="px-4 py-3 font-semibold">Status</th>
+              <th className="px-4 py-3 font-semibold">{t("common.name")}</th>
+              <th className="px-4 py-3 font-semibold">{t("common.slug")}</th>
+              <th className="px-4 py-3 font-semibold">{t("tenants.domain")}</th>
+              <th className="px-4 py-3 font-semibold">{t("common.status")}</th>
               <th className="px-4 py-3" />
             </tr>
           </thead>
           <tbody>
             {isLoading && (
-              <tr><td colSpan={5} className="px-4 py-8 text-center text-slate-400">Loading…</td></tr>
+              <tr><td colSpan={5} className="px-4 py-8 text-center text-slate-400">{t("common.loading")}</td></tr>
             )}
             {!isLoading && tenants.length === 0 && (
-              <tr><td colSpan={5} className="px-4 py-8 text-center text-slate-400">No tenants yet.</td></tr>
+              <tr><td colSpan={5} className="px-4 py-8 text-center text-slate-400">{t("tenants.empty")}</td></tr>
             )}
-            {tenants.map((t) => (
-              <tr key={t.id} className="border-b border-slate-50 last:border-0 dark:border-white/5">
+            {tenants.map((tn) => (
+              <tr key={tn.id} className="border-b border-slate-50 last:border-0 dark:border-white/5">
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-2.5">
                     <span
                       className="flex h-8 w-8 items-center justify-center rounded-lg text-[11px] font-bold text-white"
-                      style={{ backgroundColor: t.primary_color ?? "#6366f1" }}
+                      style={{ backgroundColor: tn.primary_color ?? "#6366f1" }}
                     >
-                      {t.name?.[0]?.toUpperCase() ?? "T"}
+                      {tn.name?.[0]?.toUpperCase() ?? "T"}
                     </span>
-                    <span className="font-medium text-slate-800 dark:text-slate-100">{t.name}</span>
+                    <span className="font-medium text-slate-800 dark:text-slate-100">{tn.name}</span>
+                    {tn.is_platform && (
+                      <span
+                        className="inline-flex items-center gap-1 rounded-full bg-brand-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-700 dark:bg-brand-500/15 dark:text-brand-300"
+                        title={t("tenants.platformTitle")}
+                      >
+                        <ShieldCheck size={11} />
+                        {t("tenants.platform")}
+                      </span>
+                    )}
                   </div>
                 </td>
-                <td className="px-4 py-3 font-mono text-xs text-slate-500 dark:text-slate-400">{t.slug}</td>
+                <td className="px-4 py-3 font-mono text-xs text-slate-500 dark:text-slate-400">{tn.slug}</td>
                 <td className="px-4 py-3 text-slate-500 dark:text-slate-400">
-                  {t.domain ? (
-                    <span className="inline-flex items-center gap-1.5"><Globe size={12} />{t.domain}</span>
+                  {tn.domain ? (
+                    <span className="inline-flex items-center gap-1.5"><Globe size={12} />{tn.domain}</span>
                   ) : (
                     <span className="text-slate-300 dark:text-slate-600">—</span>
                   )}
                 </td>
                 <td className="px-4 py-3">
                   <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
-                    t.active
+                    tn.active
                       ? "bg-emerald-50 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-300"
                       : "bg-slate-100 text-slate-500 dark:bg-white/10 dark:text-slate-400"
                   }`}>
-                    {t.active ? "Active" : "Disabled"}
+                    {tn.active ? t("common.active") : t("common.disabled")}
                   </span>
                 </td>
                 <td className="px-4 py-3">
                   <div className="flex items-center justify-end gap-1">
                     <button
                       type="button"
-                      onClick={() => { setEditing(t); setPanelOpen(true); }}
+                      onClick={() => { setEditing(tn); setPanelOpen(true); }}
                       className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-brand-600 dark:hover:bg-white/10"
-                      title="Edit"
+                      title={t("common.edit")}
                     >
                       <Pencil size={14} />
                     </button>
                     <button
                       type="button"
-                      onClick={() => setConfirm(t)}
-                      className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-500/10"
-                      title="Delete"
+                      onClick={() => setConfirm(tn)}
+                      disabled={tn.is_platform}
+                      className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition hover:bg-red-50 hover:text-red-500 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-slate-400 dark:hover:bg-red-500/10"
+                      title={tn.is_platform ? t("tenants.platformNoDelete") : t("common.delete")}
                     >
                       <Trash2 size={14} />
                     </button>
@@ -167,15 +253,18 @@ export default function TenantsPage() {
               initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.96 }}
               className="fixed left-1/2 top-1/2 z-50 w-full max-w-sm -translate-x-1/2 -translate-y-1/2 rounded-2xl bg-white p-6 shadow-2xl dark:bg-slate-900"
             >
-              <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">Delete tenant?</h2>
+              <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">{t("tenants.deleteTitle")}</h2>
               <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-                This removes <span className="font-medium">{confirm.name}</span> from the tenant list.
-                Its data schema is left intact on the database and must be dropped separately.
+                <Trans
+                  i18nKey="tenants.deleteDesc"
+                  values={{ name: confirm.name }}
+                  components={{ b: <span className="font-medium" /> }}
+                />
               </p>
               <div className="mt-5 flex justify-end gap-2">
-                <Button variant="ghost" onClick={() => setConfirm(null)}>Cancel</Button>
+                <Button variant="ghost" onClick={() => setConfirm(null)}>{t("common.cancel")}</Button>
                 <Button variant="danger" onClick={() => deleteMut.mutate(confirm.id)} loading={deleteMut.isPending}>
-                  Delete
+                  {t("common.delete")}
                 </Button>
               </div>
             </motion.div>
@@ -197,6 +286,7 @@ function TenantPanel({
   onClose: () => void;
   onSaved: () => void;
 }) {
+  const { t } = useTranslation();
   const isEdit = !!tenant;
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
@@ -260,7 +350,7 @@ function TenantPanel({
             <div className="flex shrink-0 items-center justify-between border-b border-slate-100 px-6 py-5 dark:border-white/10">
               <h2 className="flex items-center gap-2 text-base font-semibold text-slate-900 dark:text-slate-100">
                 <Building2 size={17} className="text-slate-400" />
-                {isEdit ? "Edit tenant" : "New tenant"}
+                {isEdit ? t("tenants.editTenant") : t("tenants.newTenant")}
               </h2>
               <button type="button" onClick={onClose} className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 dark:hover:bg-white/5">
                 <X size={18} />
@@ -270,7 +360,7 @@ function TenantPanel({
             <div className="flex-1 space-y-5 overflow-y-auto px-6 py-6">
               <div>
                 <label className="mb-1.5 block text-xs font-medium text-slate-700 dark:text-slate-200">
-                  Name <span className="text-red-400">*</span>
+                  {t("common.name")} <span className="text-red-400">*</span>
                 </label>
                 <input
                   className="input"
@@ -282,7 +372,7 @@ function TenantPanel({
 
               <div>
                 <label className="mb-1.5 block text-xs font-medium text-slate-700 dark:text-slate-200">
-                  Slug <span className="text-red-400">*</span>
+                  {t("common.slug")} <span className="text-red-400">*</span>
                 </label>
                 <input
                   className="input font-mono text-sm disabled:opacity-60"
@@ -292,12 +382,12 @@ function TenantPanel({
                   placeholder="acme"
                 />
                 <p className="mt-1 text-xs text-slate-400">
-                  {isEdit ? "The slug can't be changed after creation." : "Used for login and identification. Auto-generated from the name."}
+                  {isEdit ? t("tenants.slugHintEdit") : t("tenants.slugHintNew")}
                 </p>
               </div>
 
               <div>
-                <label className="mb-1.5 block text-xs font-medium text-slate-700 dark:text-slate-200">Domain</label>
+                <label className="mb-1.5 block text-xs font-medium text-slate-700 dark:text-slate-200">{t("tenants.domain")}</label>
                 <input
                   className="input"
                   value={domain}
@@ -305,12 +395,15 @@ function TenantPanel({
                   placeholder="acme.example.com"
                 />
                 <p className="mt-1 text-xs text-slate-400">
-                  The host that resolves to this tenant. Use <span className="font-mono">localhost</span> for the local dev tenant.
+                  <Trans
+                    i18nKey="tenants.domainHint"
+                    components={{ mono: <span className="font-mono" /> }}
+                  />
                 </p>
               </div>
 
               <div>
-                <label className="mb-1.5 block text-xs font-medium text-slate-700 dark:text-slate-200">Default language</label>
+                <label className="mb-1.5 block text-xs font-medium text-slate-700 dark:text-slate-200">{t("tenants.defaultLanguage")}</label>
                 <input
                   className="input"
                   value={lang}
@@ -323,16 +416,19 @@ function TenantPanel({
                 <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-100 bg-slate-50 px-4 py-3 dark:border-white/10 dark:bg-white/5">
                   <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} className="mt-0.5 h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-400 dark:border-white/10" />
                   <div>
-                    <p className="text-sm font-medium text-slate-800 dark:text-slate-100">Active</p>
-                    <p className="text-xs text-slate-400">Disabled tenants return 403 on every request.</p>
+                    <p className="text-sm font-medium text-slate-800 dark:text-slate-100">{t("common.active")}</p>
+                    <p className="text-xs text-slate-400">{t("tenants.activeHint")}</p>
                   </div>
                 </label>
               )}
 
               {!isEdit && (
                 <p className="rounded-xl bg-brand-50 px-3 py-2.5 text-xs text-brand-700 dark:bg-brand-500/10 dark:text-brand-300">
-                  Creating a tenant provisions its schema, base tables and a seed admin
-                  (<span className="font-mono">admin@{domain || slug || slugify(name) || "slug"}</span>, password <span className="font-mono">admin</span>) automatically.
+                  <Trans
+                    i18nKey="tenants.provisionHint"
+                    values={{ host: domain || slug || slugify(name) || "slug" }}
+                    components={{ mono: <span className="font-mono" /> }}
+                  />
                 </p>
               )}
 
@@ -345,13 +441,13 @@ function TenantPanel({
             </div>
 
             <div className="flex shrink-0 items-center justify-end gap-2 border-t border-slate-100 px-6 py-4 dark:border-white/10">
-              <Button variant="ghost" onClick={onClose}>Cancel</Button>
+              <Button variant="ghost" onClick={onClose}>{t("common.cancel")}</Button>
               <Button
                 onClick={() => { setError(null); mutation.mutate(); }}
                 loading={mutation.isPending}
                 disabled={!name.trim() || (!isEdit && !(slug || slugify(name)))}
               >
-                {isEdit ? "Save changes" : "Create tenant"}
+                {isEdit ? t("tenants.saveChanges") : t("tenants.createTenant")}
               </Button>
             </div>
           </motion.aside>

@@ -5,6 +5,7 @@ import {
   type Node,
   type NodeProps,
 } from "@xyflow/react";
+import { useTranslation } from "react-i18next";
 import { CalendarClock, Mail, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -12,15 +13,18 @@ export type WfNodeData = {
   kind: "trigger" | "action";
   title: string;
   subtitle: string;
+  /** Trigger node only: true for schedule triggers (icon/color). */
+  isSchedule?: boolean;
   selected?: boolean;
 };
 
 export type WfNode = Node<WfNodeData, "wf">;
 
 function WfNodeView({ data, selected }: NodeProps<WfNode>) {
+  const { t } = useTranslation();
   const isTrigger = data.kind === "trigger";
   const Icon = isTrigger
-    ? data.title.toLowerCase().includes("schedule")
+    ? data.isSchedule
       ? CalendarClock
       : Zap
     : Mail;
@@ -46,12 +50,12 @@ function WfNodeView({ data, selected }: NodeProps<WfNode>) {
         className={cn(
           "flex items-center gap-2 rounded-t-2xl px-3 py-2 text-white",
           isTrigger ? "bg-amber-500" : "bg-brand-600",
-          data.title.toLowerCase().includes("schedule") && isTrigger && "bg-violet-600",
+          data.isSchedule && isTrigger && "bg-violet-600",
         )}
       >
         <Icon size={14} />
         <span className="truncate text-xs font-semibold uppercase tracking-wide">
-          {isTrigger ? "Trigger" : "Action"}
+          {isTrigger ? t("workflows.trigger") : t("workflows.action")}
         </span>
       </div>
       <div className="px-3 py-2.5">

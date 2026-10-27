@@ -1,0 +1,14 @@
+{
+  "dashboard": {
+    "title": "Dashboard",
+    "subtitle": "Overview of your CMS instance",
+    "collections": "Collections",
+    "users": "Users",
+    "auditLogs": "Audit logs",
+    "activeNow": "Active now",
+    "recentActivity": "Recent Activity",
+    "system": "system",
+    "noCollections": "No collections yet",
+    "noActivity": "No activity yet"
+  }
+}

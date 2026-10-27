@@ -1,0 +1,128 @@
+{
+  "workflows": {
+    "title": "Flujos de trabajo",
+    "subtitle": "Automatizaciones que se ejecutan cuando cambia un campo o según un horario.",
+    "newWorkflow": "Nuevo flujo de trabajo",
+    "trigger": "Disparador",
+    "action": "Acción",
+    "lastFired": "Última ejecución",
+    "runHistory": "Historial de ejecuciones",
+    "noWorkflowsYet": "Aún no hay flujos de trabajo",
+    "noWorkflowsHint": "Crea uno para automatizar tus procesos.",
+    "activate": "Activar",
+    "deactivate": "Desactivar",
+    "inactive": "Inactivo",
+    "confirmDelete": "¿Eliminar el flujo de trabajo “{{name}}”? Esta acción no se puede deshacer.",
+    "triggerTypes": {
+      "field_changed": "Campo modificado",
+      "schedule": "Horario"
+    },
+    "actionTypes": {
+      "email_with_pdf": "Correo con PDF"
+    },
+    "runStatus": {
+      "pending": "Pendiente",
+      "running": "En ejecución",
+      "success": "Exitoso",
+      "failed": "Fallido",
+      "skipped": "Omitido"
+    },
+    "editor": {
+      "addNode": "Agregar nodo",
+      "emailPlusPdf": "Correo + PDF",
+      "moreActionTypes": "Aquí aparecerán más tipos de acción a medida que estén disponibles.",
+      "addAction": "Agregar acción",
+      "createWorkflow": "Crear flujo de trabajo",
+      "saveChanges": "Guardar cambios",
+      "nameRequired": "El nombre es obligatorio",
+      "addAtLeastOneAction": "Agrega al menos una acción",
+      "workflowName": "Nombre del flujo de trabajo",
+      "configureSelectedNode": "Configura el nodo seleccionado",
+      "nodeNotFound": "Nodo no encontrado"
+    },
+    "summary": {
+      "chooseCollection": "Elige una colección",
+      "pickField": "elige un campo",
+      "configureEmailPdf": "Configura el correo + PDF"
+    },
+    "runs": {
+      "refresh": "Actualizar",
+      "editWorkflow": "Editar flujo de trabajo",
+      "collectionItem": "Colección / elemento",
+      "started": "Inicio",
+      "finished": "Fin",
+      "error": "Error",
+      "noRuns": "Aún no hay ejecuciones",
+      "runDetail": "Detalle de la ejecución",
+      "collection": "Colección",
+      "item": "Elemento",
+      "steps": "Pasos",
+      "noSteps": "Sin pasos"
+    },
+    "config": {
+      "onlyIncludeWhere": "Incluir solo los elementos donde",
+      "equalityMatch": "Coincidencia exacta · una ejecución por elemento en cada ciclo",
+      "condition": "Condición",
+      "noFilter": "Sin filtro: se procesan todos los elementos (hasta el máximo).",
+      "fieldEllipsis": "Campo…",
+      "equals": "es igual a",
+      "valuePlaceholder": "valor",
+      "atMinute": "En el minuto",
+      "hour": "Hora",
+      "minute": "Minuto",
+      "dayOfMonth": "Día del mes",
+      "selectCollection": "Selecciona una colección…",
+      "triggerType": "Tipo de disparador",
+      "collection": "Colección",
+      "field": "Campo",
+      "selectField": "Selecciona un campo…",
+      "changesTo": "Cambia a",
+      "fromOptional": "Desde (opcional)",
+      "schedule": "Horario",
+      "cron": "Cron",
+      "timezone": "Zona horaria",
+      "maxItems": "Máximo de elementos por ejecución",
+      "maxItemsHint": "Limita los elementos coincidentes en cada ciclo (por defecto 50, máximo 200).",
+      "to": "Para",
+      "cc": "Cc",
+      "subject": "Asunto",
+      "body": "Cuerpo",
+      "pdfTemplate": "Plantilla PDF",
+      "pdfFilename": "Nombre del archivo PDF"
+    },
+    "schedule": {
+      "mode": {
+        "basic": "Básico",
+        "advanced": "Avanzado"
+      },
+      "frequency": {
+        "hourly": "Cada hora",
+        "daily": "Diario",
+        "weekly": "Semanal",
+        "monthly": "Mensual"
+      },
+      "describeHourly": "Cada hora en el minuto {{minute}}",
+      "describeDaily": "Todos los días a las {{time}}",
+      "describeWeekly": "Semanalmente: {{days}} a las {{time}}",
+      "describeMonthly": "Mensualmente el día {{day}} a las {{time}}"
+    },
+    "weekday": {
+      "mon": "Lunes",
+      "tue": "Martes",
+      "wed": "Miércoles",
+      "thu": "Jueves",
+      "fri": "Viernes",
+      "sat": "Sábado",
+      "sun": "Domingo"
+    },
+    "weekdayShort": {
+      "mon": "Lun",
+      "tue": "Mar",
+      "wed": "Mié",
+      "thu": "Jue",
+      "fri": "Vie",
+      "sat": "Sáb",
+      "sun": "Dom"
+    }
+  }
+}

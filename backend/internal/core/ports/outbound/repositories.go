@@ -25,6 +25,11 @@ type TenantRepository interface {
 	Update(ctx context.Context, t *tenant.Tenant) error
 	List(ctx context.Context, filter TenantFilter) ([]*tenant.Tenant, int64, error)
 	Delete(ctx context.Context, id uuid.UUID) error
+	// GetPlatform returns the single platform ("first") tenant that owns the
+	// super-admin account, or nil if none is flagged.
+	GetPlatform(ctx context.Context) (*tenant.Tenant, error)
+	// SetPlatform makes id the one-and-only platform tenant.
+	SetPlatform(ctx context.Context, id uuid.UUID) error
 	// AddStorageUsed adjusts the tenant's storage_used_bytes counter by delta
 	// (negative to release). Floors at zero. Used for file upload/delete accounting.
 	AddStorageUsed(ctx context.Context, id uuid.UUID, delta int64) error

@@ -1,0 +1,24 @@
+{
+  "profile": {
+    "title": "My Profile",
+    "subtitle": "Update your name, languages, and password. No admin permission required.",
+    "sectionProfile": "Profile",
+    "firstName": "First name",
+    "lastName": "Last name",
+    "emailLocked": "Email cannot be changed here.",
+    "contentLanguage": "Content language",
+    "contentLanguageHint": "Default language for creating and viewing content entries.",
+    "interfaceLanguage": "Interface language",
+    "interfaceLanguageHint": "Language of the admin panel itself.",
+    "saveProfile": "Save profile",
+    "sectionPassword": "Password",
+    "newPassword": "New password",
+    "confirmPassword": "Confirm new password",
+    "passwordHint": "Minimum 8 characters.",
+    "updatePassword": "Update password",
+    "passwordUpdated": "Password updated",
+    "passwordTooShort": "Password must be at least 8 characters.",
+    "passwordMismatch": "Passwords do not match.",
+    "ssoNote": "Your account uses SSO. Password is managed by your identity provider."
+  }
+}

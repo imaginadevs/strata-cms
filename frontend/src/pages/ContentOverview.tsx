@@ -7,6 +7,7 @@
  */
 import { useState } from "react";
 import { Link } from "@tanstack/react-router";
+import { useTranslation } from "react-i18next";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Search, Database, Lock, Folder, Plus, Pencil, Trash2,
@@ -23,6 +24,7 @@ const GROUP_COLORS = [
 
 // Best-effort item count for a collection card (silent on error).
 function ItemCount({ name }: { name: string }) {
+  const { t } = useTranslation();
   const { data } = useQuery({
     queryKey: ["item-count", name],
     queryFn: () => get<PaginatedResponse<unknown>>(`/items/${name}?limit=1`),
@@ -32,7 +34,7 @@ function ItemCount({ name }: { name: string }) {
   if (data?.total == null) return null;
   return (
     <p className="text-xs text-slate-400">
-      {data.total.toLocaleString()} item{data.total === 1 ? "" : "s"}
+      {t("content.itemCount", { count: data.total })}
     </p>
   );
 }
@@ -54,6 +56,7 @@ function CollectionCard({
   isFirst: boolean;
   isLast: boolean;
 }) {
+  const { t } = useTranslation();
   const Icon = c.is_system ? Lock : Database;
   const color = c.color ?? undefined;
 
@@ -100,7 +103,7 @@ function CollectionCard({
             onClick={() => onMove(-1)}
             disabled={isFirst}
             className="text-slate-300 transition hover:text-slate-600 disabled:opacity-30 dark:hover:text-slate-200"
-            title="Move up"
+            title={t("content.moveUp")}
           >
             <ChevronUp size={14} />
           </button>
@@ -109,7 +112,7 @@ function CollectionCard({
             onClick={() => onMove(1)}
             disabled={isLast}
             className="text-slate-300 transition hover:text-slate-600 disabled:opacity-30 dark:hover:text-slate-200"
-            title="Move down"
+            title={t("content.moveDown")}
           >
             <ChevronDown size={14} />
           </button>
@@ -118,9 +121,9 @@ function CollectionCard({
           value={c.group_id ?? ""}
           onChange={(e) => onReassign(e.target.value || null)}
           className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-700 focus:border-brand-400 focus:outline-none dark:border-white/10 dark:bg-white/5 dark:text-slate-200"
-          title="Move to group"
+          title={t("content.moveToGroup")}
         >
-          <option value="">Ungrouped</option>
+          <option value="">{t("content.ungrouped")}</option>
           {groups.map((g) => (
             <option key={g.id} value={g.id}>{g.name}</option>
           ))}
@@ -131,6 +134,7 @@ function CollectionCard({
 }
 
 export default function ContentOverviewPage() {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const [manage, setManage] = useState(false);
   const [query, setQuery] = useState("");
@@ -237,10 +241,10 @@ export default function ContentOverviewPage() {
       {/* Header */}
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100">Content</h1>
+          <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100">{t("content.title")}</h1>
           <p className="text-sm text-slate-400">
-            {visible.length} collection{visible.length === 1 ? "" : "s"} · {sortedGroups.length} group
-            {sortedGroups.length === 1 ? "" : "s"}
+            {t("content.collectionCount", { count: visible.length })} ·{" "}
+            {t("content.groupCount", { count: sortedGroups.length })}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -249,13 +253,13 @@ export default function ContentOverviewPage() {
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search collections…"
+              placeholder={t("content.searchCollections")}
               className="w-44 bg-transparent text-sm text-slate-700 placeholder:text-slate-400 focus:outline-none dark:text-slate-200"
             />
           </div>
           <Button variant={manage ? "primary" : "outline"} size="sm" onClick={() => setManage((m) => !m)}>
             <Settings2 size={14} className="mr-1.5" />
-            {manage ? "Done" : "Manage"}
+            {manage ? t("content.done") : t("content.manage")}
           </Button>
         </div>
       </div>
@@ -272,7 +276,7 @@ export default function ContentOverviewPage() {
                 createGroup.mutate({ name: newGroup.trim(), color: GROUP_COLORS[groups.length % GROUP_COLORS.length], sort: groups.length });
               }
             }}
-            placeholder="New group name…"
+            placeholder={t("content.newGroupName")}
             className="flex-1 bg-transparent text-sm text-slate-700 placeholder:text-slate-400 focus:outline-none dark:text-slate-200"
           />
           <Button
@@ -284,7 +288,7 @@ export default function ContentOverviewPage() {
             disabled={!newGroup.trim() || createGroup.isPending}
           >
             <Plus size={14} className="mr-1" />
-            Add group
+            {t("content.addGroup")}
           </Button>
         </div>
       )}
@@ -315,10 +319,10 @@ export default function ContentOverviewPage() {
                       }}
                       className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-sm text-slate-800 focus:border-brand-400 focus:outline-none dark:border-white/10 dark:bg-white/5 dark:text-slate-100"
                     />
-                    <button type="button" onClick={() => editName.trim() && updateGroup.mutate({ id: g.id, name: editName.trim() })} className="text-emerald-500 hover:text-emerald-600" title="Save">
+                    <button type="button" onClick={() => editName.trim() && updateGroup.mutate({ id: g.id, name: editName.trim() })} className="text-emerald-500 hover:text-emerald-600" title={t("common.save")}>
                       <Check size={15} />
                     </button>
-                    <button type="button" onClick={() => setEditingId(null)} className="text-slate-400 hover:text-slate-600" title="Cancel">
+                    <button type="button" onClick={() => setEditingId(null)} className="text-slate-400 hover:text-slate-600" title={t("common.cancel")}>
                       <X size={15} />
                     </button>
                   </div>
@@ -338,26 +342,26 @@ export default function ContentOverviewPage() {
                         onClick={() => updateGroup.mutate({ id: g.id, color: col })}
                         className="h-4 w-4 rounded-full ring-1 ring-white/60 transition hover:scale-110"
                         style={{ backgroundColor: col }}
-                        title="Set colour"
-                        aria-label={`Set group colour ${col}`}
+                        title={t("content.setColor")}
+                        aria-label={t("content.setGroupColor", { color: col })}
                       />
                     ))}
-                    <button type="button" onClick={() => moveGroup(gi, -1)} disabled={gi === 0} className="ml-1 text-slate-300 transition hover:text-slate-600 disabled:opacity-30 dark:hover:text-slate-200" title="Move group up">
+                    <button type="button" onClick={() => moveGroup(gi, -1)} disabled={gi === 0} className="ml-1 text-slate-300 transition hover:text-slate-600 disabled:opacity-30 dark:hover:text-slate-200" title={t("content.moveGroupUp")}>
                       <ChevronUp size={15} />
                     </button>
-                    <button type="button" onClick={() => moveGroup(gi, 1)} disabled={gi === sortedGroups.length - 1} className="text-slate-300 transition hover:text-slate-600 disabled:opacity-30 dark:hover:text-slate-200" title="Move group down">
+                    <button type="button" onClick={() => moveGroup(gi, 1)} disabled={gi === sortedGroups.length - 1} className="text-slate-300 transition hover:text-slate-600 disabled:opacity-30 dark:hover:text-slate-200" title={t("content.moveGroupDown")}>
                       <ChevronDown size={15} />
                     </button>
-                    <button type="button" onClick={() => { setEditingId(g.id); setEditName(g.name); }} className="text-slate-300 transition hover:text-brand-500" title="Rename">
+                    <button type="button" onClick={() => { setEditingId(g.id); setEditName(g.name); }} className="text-slate-300 transition hover:text-brand-500" title={t("content.rename")}>
                       <Pencil size={14} />
                     </button>
                     <button
                       type="button"
                       onClick={() => {
-                        if (confirm(`Delete group “${g.name}”? Its collections become ungrouped.`)) deleteGroup.mutate(g.id);
+                        if (confirm(t("content.deleteGroupConfirm", { name: g.name }))) deleteGroup.mutate(g.id);
                       }}
                       className="text-slate-300 transition hover:text-red-500"
-                      title="Delete group"
+                      title={t("content.deleteGroup")}
                     >
                       <Trash2 size={14} />
                     </button>
@@ -368,7 +372,7 @@ export default function ContentOverviewPage() {
                 renderCards(items, g.id)
               ) : (
                 <p className="rounded-xl border border-dashed border-slate-200 px-4 py-6 text-center text-sm text-slate-400 dark:border-white/10">
-                  {manage ? "No collections — move some here from the Ungrouped section." : "No collections."}
+                  {manage ? t("content.noCollectionsManage") : t("content.noCollections")}
                 </p>
               )}
             </section>
@@ -380,14 +384,14 @@ export default function ContentOverviewPage() {
           <section>
             {sortedGroups.length > 0 && (
               <div className="mb-3 flex items-center gap-2">
-                <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Ungrouped</h2>
+                <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">{t("content.ungrouped")}</h2>
                 <span className="text-xs text-slate-400">{ungrouped.length}</span>
               </div>
             )}
             {ungrouped.length > 0 ? (
               renderCards(ungrouped, null)
             ) : (
-              <p className="text-sm text-slate-400">No ungrouped collections.</p>
+              <p className="text-sm text-slate-400">{t("content.noUngrouped")}</p>
             )}
           </section>
         )}

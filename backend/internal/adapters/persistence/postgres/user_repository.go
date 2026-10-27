@@ -20,18 +20,18 @@ type userRepository struct{ db *pgxpool.Pool }
 const userCols = `
     id, email, first_name, last_name, avatar,
     status, provider, provider_uid, password_hash, last_login,
-    language, is_super_admin, created_at, updated_at, created_by, updated_by`
+    language, ui_language, is_super_admin, created_at, updated_at, created_by, updated_by`
 
 func (r *userRepository) Create(ctx context.Context, tenantID uuid.UUID, u *userdomain.User) error {
 	s := schemaOf(tenantID)
 	_, err := r.db.Exec(ctx, fmt.Sprintf(`
 		INSERT INTO %s.users
 		    (id, email, first_name, last_name, avatar,
-		     status, provider, provider_uid, password_hash, language,
+		     status, provider, provider_uid, password_hash, language, ui_language,
 		     created_by, updated_by)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`, s),
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`, s),
 		u.ID, u.Email, u.FirstName, u.LastName, u.Avatar,
-		u.Status, u.Provider, u.ProviderUID, u.PasswordHash, u.Language,
+		u.Status, u.Provider, u.ProviderUID, u.PasswordHash, u.Language, u.UILanguage,
 		u.CreatedBy, u.UpdatedBy,
 	)
 	return err
@@ -81,11 +81,11 @@ func (r *userRepository) Update(ctx context.Context, tenantID uuid.UUID, u *user
 	_, err := r.db.Exec(ctx, fmt.Sprintf(`
 		UPDATE %s.users
 		SET email=$1, first_name=$2, last_name=$3, avatar=$4,
-		    status=$5, provider=$6, provider_uid=$7, language=$8,
-		    updated_by=$9, updated_at=NOW()
-		WHERE id=$10`, s),
+		    status=$5, provider=$6, provider_uid=$7, language=$8, ui_language=$9,
+		    updated_by=$10, updated_at=NOW()
+		WHERE id=$11`, s),
 		u.Email, u.FirstName, u.LastName, u.Avatar,
-		u.Status, u.Provider, u.ProviderUID, u.Language,
+		u.Status, u.Provider, u.ProviderUID, u.Language, u.UILanguage,
 		u.UpdatedBy, u.ID,
 	)
 	return err
@@ -277,7 +277,7 @@ func scanUserRow(row rowScanner) (*userdomain.User, error) {
 	err := row.Scan(
 		&u.ID, &u.Email, &u.FirstName, &u.LastName, &u.Avatar,
 		&u.Status, &u.Provider, &u.ProviderUID, &u.PasswordHash, &u.LastLogin,
-		&u.Language, &u.IsSuperAdmin, &u.CreatedAt, &u.UpdatedAt, &u.CreatedBy, &u.UpdatedBy,
+		&u.Language, &u.UILanguage, &u.IsSuperAdmin, &u.CreatedAt, &u.UpdatedAt, &u.CreatedBy, &u.UpdatedBy,
 	)
 	if err != nil {
 		return nil, err

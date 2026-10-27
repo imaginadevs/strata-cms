@@ -11,6 +11,7 @@ import {
   Info,
 } from "lucide-react";
 import { useNavigate } from "@tanstack/react-router";
+import { useTranslation } from "react-i18next";
 import { get, post } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { notificationKeys } from "@/hooks/useNotificationsRealtime";
@@ -49,6 +50,7 @@ function relativeTime(iso: string) {
 }
 
 export function NotificationsBell() {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -160,8 +162,8 @@ export function NotificationsBell() {
           type="button"
           aria-label={
             unread > 0
-              ? `Notifications, ${unread} unread`
-              : "Notifications"
+              ? t("notifications.ariaUnread", { n: unread })
+              : t("shell.notifications")
           }
           className="relative flex h-9 w-9 items-center justify-center rounded-xl
                      text-slate-500 transition hover:bg-slate-100
@@ -191,11 +193,11 @@ export function NotificationsBell() {
           <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3 dark:border-white/10">
             <div>
               <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                Notifications
+                {t("shell.notifications")}
               </p>
               {unread > 0 && (
                 <p className="text-[11px] text-slate-400">
-                  {unread} unread
+                  {t("notifications.unreadCount", { n: unread })}
                 </p>
               )}
             </div>
@@ -208,18 +210,18 @@ export function NotificationsBell() {
                          disabled:opacity-40 dark:text-brand-300 dark:hover:bg-brand-500/10"
             >
               <CheckCheck size={13} />
-              Mark all read
+              {t("shell.markAllRead")}
             </button>
           </div>
 
           <div className="max-h-[min(24rem,60vh)] overflow-y-auto">
             {isLoading && items.length === 0 ? (
               <p className="px-4 py-10 text-center text-sm text-slate-400">
-                Loading…
+                {t("common.loading")}
               </p>
             ) : items.length === 0 ? (
               <p className="px-4 py-10 text-center text-sm text-slate-400">
-                You&apos;re all caught up
+                {t("shell.noNotifications")}
               </p>
             ) : (
               <ul className="divide-y divide-slate-50 dark:divide-white/5">
@@ -277,7 +279,7 @@ export function NotificationsBell() {
             )}
             {isFetching && !isLoading && (
               <p className="border-t border-slate-50 px-4 py-2 text-center text-[10px] text-slate-400 dark:border-white/5">
-                Updating…
+                {t("common.updating")}
               </p>
             )}
           </div>

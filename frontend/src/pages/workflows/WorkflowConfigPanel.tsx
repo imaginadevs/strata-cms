@@ -2,6 +2,7 @@
  * Right-hand config panel for the selected canvas node.
  */
 import { useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
 import * as Switch from "@radix-ui/react-switch";
 import { Plus, Trash2, X } from "lucide-react";
@@ -34,6 +35,7 @@ import type {
   WorkflowDraft,
 } from "./model";
 import { TRIGGER_NODE_ID } from "./model";
+import { actionTypeLabel, triggerTypeLabel } from "./helpers";
 
 function FilterBuilder({
   fields,
@@ -46,6 +48,8 @@ function FilterBuilder({
   onChange: (rules: FilterRule[]) => void;
   disabled?: boolean;
 }) {
+  const { t } = useTranslation();
+
   function update(id: string, patch: Partial<FilterRule>) {
     onChange(rules.map((r) => (r.id === id ? { ...r, ...patch } : r)));
   }
@@ -55,10 +59,10 @@ function FilterBuilder({
       <div className="flex items-center justify-between gap-2">
         <div>
           <p className="text-xs font-medium text-slate-700 dark:text-slate-200">
-            Only include items where
+            {t("workflows.config.onlyIncludeWhere")}
           </p>
           <p className="text-[11px] text-slate-400">
-            Equality match · one run per item each tick
+            {t("workflows.config.equalityMatch")}
           </p>
         </div>
         <Button
@@ -78,12 +82,12 @@ function FilterBuilder({
           }
         >
           <Plus size={14} />
-          Condition
+          {t("workflows.config.condition")}
         </Button>
       </div>
       {rules.length === 0 ? (
         <p className="rounded-xl border border-dashed border-slate-200 px-3 py-3 text-center text-xs text-slate-400 dark:border-white/10">
-          No filter — all items (up to max) are processed.
+          {t("workflows.config.noFilter")}
         </p>
       ) : (
         <ul className="space-y-2">
@@ -98,26 +102,28 @@ function FilterBuilder({
                 disabled={disabled}
                 onChange={(e) => update(rule.id, { field: e.target.value })}
               >
-                <option value="">Field…</option>
+                <option value="">{t("workflows.config.fieldEllipsis")}</option>
                 {fields.map((f) => (
                   <option key={f.id} value={f.name}>
                     {f.display_name || f.name}
                   </option>
                 ))}
               </select>
-              <span className="text-xs text-slate-400">equals</span>
+              <span className="text-xs text-slate-400">
+                {t("workflows.config.equals")}
+              </span>
               <input
                 className="input h-9 min-w-[7rem] flex-1 text-xs"
                 value={rule.value}
                 disabled={disabled}
                 onChange={(e) => update(rule.id, { value: e.target.value })}
-                placeholder="value"
+                placeholder={t("workflows.config.valuePlaceholder")}
               />
               <button
                 type="button"
                 className="rounded-lg p-2 text-slate-400 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-500/10"
                 onClick={() => onChange(rules.filter((r) => r.id !== rule.id))}
-                aria-label="Remove"
+                aria-label={t("common.remove")}
               >
                 <Trash2 size={14} />
               </button>
@@ -136,11 +142,12 @@ function ScheduleBasicBuilder({
   value: BasicSchedule;
   onChange: (next: BasicSchedule) => void;
 }) {
+  const { t } = useTranslation();
   const freqs: { id: ScheduleFrequency; label: string }[] = [
-    { id: "hourly", label: "Hourly" },
-    { id: "daily", label: "Daily" },
-    { id: "weekly", label: "Weekly" },
-    { id: "monthly", label: "Monthly" },
+    { id: "hourly", label: t("workflows.schedule.frequency.hourly") },
+    { id: "daily", label: t("workflows.schedule.frequency.daily") },
+    { id: "weekly", label: t("workflows.schedule.frequency.weekly") },
+    { id: "monthly", label: t("workflows.schedule.frequency.monthly") },
   ];
 
   function toggleDay(day: number) {
@@ -174,7 +181,7 @@ function ScheduleBasicBuilder({
       {value.frequency === "hourly" ? (
         <div>
           <label className="mb-1.5 block text-xs font-medium text-slate-700 dark:text-slate-200">
-            At minute
+            {t("workflows.config.atMinute")}
           </label>
           <input
             type="number"
@@ -191,7 +198,7 @@ function ScheduleBasicBuilder({
         <div className="grid grid-cols-2 gap-2">
           <div>
             <label className="mb-1.5 block text-xs font-medium text-slate-700 dark:text-slate-200">
-              Hour
+              {t("workflows.config.hour")}
             </label>
             <input
               type="number"
@@ -206,7 +213,7 @@ function ScheduleBasicBuilder({
           </div>
           <div>
             <label className="mb-1.5 block text-xs font-medium text-slate-700 dark:text-slate-200">
-              Minute
+              {t("workflows.config.minute")}
             </label>
             <input
               type="number"
@@ -230,7 +237,7 @@ function ScheduleBasicBuilder({
               <button
                 key={d.value}
                 type="button"
-                title={d.label}
+                title={t(d.label)}
                 onClick={() => toggleDay(d.value)}
                 className={cn(
                   "h-8 min-w-8 rounded-lg px-2 text-xs font-semibold",
@@ -239,7 +246,7 @@ function ScheduleBasicBuilder({
                     : "bg-slate-100 text-slate-500 dark:bg-white/5 dark:text-slate-400",
                 )}
               >
-                {d.short}
+                {t(d.short)}
               </button>
             );
           })}
@@ -249,7 +256,7 @@ function ScheduleBasicBuilder({
       {value.frequency === "monthly" && (
         <div>
           <label className="mb-1.5 block text-xs font-medium text-slate-700 dark:text-slate-200">
-            Day of month
+            {t("workflows.config.dayOfMonth")}
           </label>
           <input
             type="number"
@@ -265,7 +272,7 @@ function ScheduleBasicBuilder({
       )}
 
       <p className="rounded-lg bg-slate-50 px-2.5 py-2 text-[11px] text-slate-600 dark:bg-white/5 dark:text-slate-300">
-        {describeBasic(value)}{" "}
+        {describeBasic(value, t)}{" "}
         <span className="font-mono text-slate-400">({basicToCron(value)})</span>
       </p>
     </div>
@@ -279,6 +286,7 @@ function CollectionSelect({
   value: string;
   onChange: (name: string) => void;
 }) {
+  const { t } = useTranslation();
   const { data } = useQuery({
     queryKey: ["collections", { hidden: true }],
     queryFn: () =>
@@ -294,7 +302,7 @@ function CollectionSelect({
       value={value}
       onChange={(e) => onChange(e.target.value)}
     >
-      <option value="">Select collection…</option>
+      <option value="">{t("workflows.config.selectCollection")}</option>
       {collections.map((c) => (
         <option key={c.id} value={c.name}>
           {c.display_name} ({c.name})
@@ -322,6 +330,7 @@ function TriggerConfig({
   catalog?: WorkflowCatalog;
   onChange: (next: TriggerDraft) => void;
 }) {
+  const { t } = useTranslation();
   const fields = useCollectionFields(trigger.collection);
   const triggers = catalog?.triggers ?? [];
   const timezones = useMemo(() => {
@@ -338,29 +347,29 @@ function TriggerConfig({
     <div className="space-y-4">
       <div>
         <label className="mb-1.5 block text-xs font-medium text-slate-700 dark:text-slate-200">
-          Trigger type
+          {t("workflows.config.triggerType")}
         </label>
         <div className="grid gap-1.5">
           {(triggers.length
             ? triggers
             : [
-                { type: "field_changed", name: "Field changed", description: "" },
-                { type: "schedule", name: "Schedule", description: "" },
+                { type: "field_changed", name: "", description: "" },
+                { type: "schedule", name: "", description: "" },
               ]
-          ).map((t) => (
+          ).map((tt) => (
             <button
-              key={t.type}
+              key={tt.type}
               type="button"
-              onClick={() => patch({ type: t.type as WorkflowTriggerType })}
+              onClick={() => patch({ type: tt.type as WorkflowTriggerType })}
               className={cn(
                 "rounded-xl border px-3 py-2 text-left text-xs transition",
-                trigger.type === t.type
+                trigger.type === tt.type
                   ? "border-brand-300 bg-brand-50 dark:border-brand-500/40 dark:bg-brand-500/10"
                   : "border-slate-100 dark:border-white/10",
               )}
             >
               <span className="font-semibold text-slate-800 dark:text-slate-100">
-                {t.name}
+                {triggerTypeLabel(t, tt.type, tt.name)}
               </span>
             </button>
           ))}
@@ -369,7 +378,7 @@ function TriggerConfig({
 
       <div>
         <label className="mb-1.5 block text-xs font-medium text-slate-700 dark:text-slate-200">
-          Collection
+          {t("workflows.config.collection")}
         </label>
         <CollectionSelect
           value={trigger.collection}
@@ -383,7 +392,7 @@ function TriggerConfig({
         <>
           <div>
             <label className="mb-1.5 block text-xs font-medium text-slate-700 dark:text-slate-200">
-              Field
+              {t("workflows.config.field")}
             </label>
             <select
               className="input"
@@ -391,7 +400,7 @@ function TriggerConfig({
               disabled={!trigger.collection}
               onChange={(e) => patch({ field: e.target.value })}
             >
-              <option value="">Select field…</option>
+              <option value="">{t("workflows.config.selectField")}</option>
               {fields.map((f) => (
                 <option key={f.id} value={f.name}>
                   {f.display_name || f.name}
@@ -401,7 +410,7 @@ function TriggerConfig({
           </div>
           <div>
             <label className="mb-1.5 block text-xs font-medium text-slate-700 dark:text-slate-200">
-              Changes to
+              {t("workflows.config.changesTo")}
             </label>
             <input
               className="input"
@@ -412,7 +421,7 @@ function TriggerConfig({
           </div>
           <div>
             <label className="mb-1.5 block text-xs font-medium text-slate-700 dark:text-slate-200">
-              From (optional)
+              {t("workflows.config.fromOptional")}
             </label>
             <input
               className="input"
@@ -426,7 +435,7 @@ function TriggerConfig({
         <>
           <div className="flex items-center justify-between">
             <p className="text-xs font-medium text-slate-700 dark:text-slate-200">
-              Schedule
+              {t("workflows.config.schedule")}
             </p>
             <div className="flex rounded-lg border border-slate-200 p-0.5 dark:border-white/10">
               {(["basic", "advanced"] as ScheduleMode[]).map((mode) => (
@@ -449,13 +458,13 @@ function TriggerConfig({
                     }
                   }}
                   className={cn(
-                    "rounded-md px-2 py-1 text-[11px] font-semibold capitalize",
+                    "rounded-md px-2 py-1 text-[11px] font-semibold",
                     trigger.scheduleMode === mode
                       ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900"
                       : "text-slate-500",
                   )}
                 >
-                  {mode}
+                  {t(`workflows.schedule.mode.${mode}`)}
                 </button>
               ))}
             </div>
@@ -471,7 +480,7 @@ function TriggerConfig({
           ) : (
             <div>
               <label className="mb-1.5 block text-xs font-medium text-slate-700 dark:text-slate-200">
-                Cron
+                {t("workflows.config.cron")}
               </label>
               <input
                 className="input font-mono text-xs"
@@ -483,7 +492,7 @@ function TriggerConfig({
 
           <div>
             <label className="mb-1.5 block text-xs font-medium text-slate-700 dark:text-slate-200">
-              Timezone
+              {t("workflows.config.timezone")}
             </label>
             <select
               className="input"
@@ -507,7 +516,7 @@ function TriggerConfig({
 
           <div>
             <label className="mb-1.5 block text-xs font-medium text-slate-700 dark:text-slate-200">
-              Max items per run
+              {t("workflows.config.maxItems")}
             </label>
             <input
               type="number"
@@ -518,7 +527,7 @@ function TriggerConfig({
               onChange={(e) => patch({ limit: e.target.value })}
             />
             <p className="mt-1 text-[11px] text-slate-400">
-              Cap matching items each tick (default 50, max 200).
+              {t("workflows.config.maxItemsHint")}
             </p>
           </div>
         </>
@@ -538,6 +547,8 @@ function ActionConfig({
   onDelete: () => void;
   canDelete: boolean;
 }) {
+  const { t } = useTranslation();
+
   function patch(p: Partial<ActionDraft>) {
     onChange({ ...action, ...p });
   }
@@ -546,18 +557,18 @@ function ActionConfig({
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-          Email with PDF
+          {actionTypeLabel(t, "email_with_pdf")}
         </p>
         {canDelete && (
           <Button type="button" size="sm" variant="ghost" onClick={onDelete}>
             <Trash2 size={14} />
-            Remove
+            {t("common.remove")}
           </Button>
         )}
       </div>
       <div>
         <label className="mb-1.5 block text-xs font-medium text-slate-700 dark:text-slate-200">
-          To
+          {t("workflows.config.to")}
         </label>
         <input
           className="input font-mono text-xs"
@@ -568,7 +579,7 @@ function ActionConfig({
       </div>
       <div>
         <label className="mb-1.5 block text-xs font-medium text-slate-700 dark:text-slate-200">
-          Cc
+          {t("workflows.config.cc")}
         </label>
         <input
           className="input font-mono text-xs"
@@ -578,7 +589,7 @@ function ActionConfig({
       </div>
       <div>
         <label className="mb-1.5 block text-xs font-medium text-slate-700 dark:text-slate-200">
-          Subject
+          {t("workflows.config.subject")}
         </label>
         <input
           className="input"
@@ -588,7 +599,7 @@ function ActionConfig({
       </div>
       <div>
         <label className="mb-1.5 block text-xs font-medium text-slate-700 dark:text-slate-200">
-          Body
+          {t("workflows.config.body")}
         </label>
         <textarea
           className="input min-h-[88px]"
@@ -599,7 +610,7 @@ function ActionConfig({
       <div className="grid grid-cols-1 gap-3">
         <div>
           <label className="mb-1.5 block text-xs font-medium text-slate-700 dark:text-slate-200">
-            PDF template
+            {t("workflows.config.pdfTemplate")}
           </label>
           <input
             className="input font-mono text-xs"
@@ -610,7 +621,7 @@ function ActionConfig({
         </div>
         <div>
           <label className="mb-1.5 block text-xs font-medium text-slate-700 dark:text-slate-200">
-            PDF filename
+            {t("workflows.config.pdfFilename")}
           </label>
           <input
             className="input font-mono text-xs"
@@ -637,6 +648,8 @@ export function WorkflowConfigPanel({
   onClose: () => void;
   onChangeDraft: (next: WorkflowDraft) => void;
 }) {
+  const { t } = useTranslation();
+
   if (!selectedId) return null;
 
   const isTrigger = selectedId === TRIGGER_NODE_ID;
@@ -647,15 +660,16 @@ export function WorkflowConfigPanel({
       <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3 dark:border-white/10">
         <div>
           <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-            {isTrigger ? "Trigger" : "Action"}
+            {isTrigger ? t("workflows.trigger") : t("workflows.action")}
           </p>
           <p className="text-[11px] text-slate-400">
-            Configure the selected node
+            {t("workflows.editor.configureSelectedNode")}
           </p>
         </div>
         <button
           type="button"
           onClick={onClose}
+          aria-label={t("common.close")}
           className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5"
         >
           <X size={16} />
@@ -688,7 +702,9 @@ export function WorkflowConfigPanel({
             }
           />
         ) : (
-          <p className="text-sm text-slate-400">Node not found</p>
+          <p className="text-sm text-slate-400">
+            {t("workflows.editor.nodeNotFound")}
+          </p>
         )}
       </div>
     </aside>
@@ -702,16 +718,17 @@ export function WorkflowMetaBar({
   draft: WorkflowDraft;
   onChange: (next: WorkflowDraft) => void;
 }) {
+  const { t } = useTranslation();
   return (
     <div className="flex flex-wrap items-center gap-3">
       <input
         className="input h-9 max-w-xs flex-1 text-sm font-medium"
         value={draft.name}
         onChange={(e) => onChange({ ...draft, name: e.target.value })}
-        placeholder="Workflow name"
+        placeholder={t("workflows.editor.workflowName")}
       />
       <div className="flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-1.5 dark:border-white/10">
-        <span className="text-xs text-slate-500">Active</span>
+        <span className="text-xs text-slate-500">{t("common.active")}</span>
         <Switch.Root
           checked={draft.active}
           onCheckedChange={(active) => onChange({ ...draft, active })}

@@ -1,3 +1,5 @@
+import type { TFunction } from "i18next";
+import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
 import type {
   WorkflowRunStatus,
@@ -5,15 +7,29 @@ import type {
   WorkflowTriggerType,
 } from "@/types";
 
-export function triggerTypeLabel(t: WorkflowTriggerType | string) {
-  switch (t) {
+export function triggerTypeLabel(
+  t: TFunction,
+  type: WorkflowTriggerType | string,
+  fallback?: string,
+) {
+  switch (type) {
     case "field_changed":
-      return "Field changed";
     case "schedule":
-      return "Schedule";
+      return t(`workflows.triggerTypes.${type}`);
     default:
-      return t;
+      return fallback ?? type;
   }
+}
+
+export function actionTypeLabel(t: TFunction, type: string) {
+  return type === "email_with_pdf" ? t("workflows.actionTypes.email_with_pdf") : type;
+}
+
+export function runStatusLabel(
+  t: TFunction,
+  status: WorkflowRunStatus | WorkflowStepStatus,
+) {
+  return t(`workflows.runStatus.${status}`, { defaultValue: status });
 }
 
 export function runStatusBadge(status: WorkflowRunStatus | WorkflowStepStatus) {
@@ -33,13 +49,14 @@ export function runStatusBadge(status: WorkflowRunStatus | WorkflowStepStatus) {
 }
 
 export function ActiveDot({ active }: { active: boolean }) {
+  const { t } = useTranslation();
   return (
     <span
       className={cn(
         "inline-block h-2 w-2 rounded-full",
         active ? "bg-emerald-500" : "bg-slate-300 dark:bg-slate-600",
       )}
-      title={active ? "Active" : "Inactive"}
+      title={active ? t("common.active") : t("workflows.inactive")}
     />
   );
 }

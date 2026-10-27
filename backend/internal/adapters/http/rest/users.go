@@ -414,9 +414,10 @@ func (h *userHandler) updateMe(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var body struct {
-		FirstName *string `json:"first_name"`
-		LastName  *string `json:"last_name"`
-		Language  *string `json:"language"`
+		FirstName  *string `json:"first_name"`
+		LastName   *string `json:"last_name"`
+		Language   *string `json:"language"`
+		UILanguage *string `json:"ui_language"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid body")
@@ -430,6 +431,9 @@ func (h *userHandler) updateMe(w http.ResponseWriter, r *http.Request) {
 	}
 	if body.Language != nil {
 		u.Language = *body.Language
+	}
+	if body.UILanguage != nil {
+		u.UILanguage = *body.UILanguage
 	}
 	u.Touch(&userID)
 

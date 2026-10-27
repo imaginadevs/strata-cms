@@ -11,6 +11,7 @@
  */
 import { useState } from "react";
 import { createPortal } from "react-dom";
+import { useTranslation } from "react-i18next";
 import { useParams, useNavigate } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
@@ -32,6 +33,7 @@ import {
   childRelationsOf,
   getItemDeep,
   listRelations,
+  withRelationOptions,
   type ChildRelation,
 } from "@/lib/relational";
 import { allFields, isSectionVisible, sortedSections, visibleSectionFields } from "@/lib/collection";
@@ -142,7 +144,7 @@ function ItemPanel({
         ) : (
           <ItemPanelForm
             collectionName={collectionName}
-            fields={fields}
+            fields={withRelationOptions(fields, relations ?? [], collectionName)}
             mode={mode}
             childRels={childRels}
             initialItem={initialItem}
@@ -173,6 +175,7 @@ function ItemPanelForm({
   onClose: () => void;
   onSaved: () => void;
 }) {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const availableLanguages = useAvailableLanguages();
   const [language, setLanguage] = useState(
@@ -217,7 +220,7 @@ function ItemPanelForm({
     const errors: Record<string, string> = {};
     for (const f of fields) {
       if (f.required && (values[f.name] == null || values[f.name] === "")) {
-        errors[f.name] = `${f.display_name} is required`;
+        errors[f.name] = t("content.fieldRequired", { field: f.display_name });
       }
     }
     setFieldErrors(errors);
@@ -245,7 +248,7 @@ function ItemPanelForm({
             {collectionName}
           </p>
           <h2 className="text-base font-bold text-slate-900 dark:text-slate-100">
-            {mode.kind === "create" ? "New Item" : "Edit Item"}
+            {mode.kind === "create" ? t("content.newItem") : t("content.editItem")}
           </h2>
         </div>
         <div className="flex items-center gap-2">
@@ -259,11 +262,11 @@ function ItemPanelForm({
                   params: { collection: collectionName, id: toItemId(mode.item.id) },
                 });
               }}
-              title="Open full editor"
+              title={t("content.openFullEditor")}
               className="flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-xs font-medium text-slate-500 dark:text-slate-400 transition hover:bg-slate-100 dark:hover:bg-white/5 hover:text-slate-700 dark:hover:text-slate-100"
             >
               <Maximize2 size={13} />
-              Full editor
+              {t("content.fullEditor")}
             </button>
           )}
           <LanguageSelector
@@ -289,7 +292,7 @@ function ItemPanelForm({
       >
         {fields.length === 0 ? (
           <p className="text-sm text-slate-400">
-            No fields defined for this collection yet.
+            {t("content.noFields")}
           </p>
         ) : (
           <FieldGroup
@@ -322,15 +325,15 @@ function ItemPanelForm({
       {/* Footer */}
       <div className="flex shrink-0 items-center justify-between border-t border-slate-100 dark:border-white/10 px-5 py-4">
         <Button variant="ghost" type="button" onClick={onClose}>
-          Cancel
+          {t("common.cancel")}
         </Button>
         <Button type="submit" form="item-form" disabled={saveMut.isPending}>
           <Save size={14} />
           {saveMut.isPending
-            ? "Saving…"
+            ? t("common.saving")
             : mode.kind === "create"
-            ? "Create Item"
-            : "Save Changes"}
+            ? t("content.createItem")
+            : t("content.saveChanges")}
         </Button>
       </div>
     </>
@@ -350,6 +353,7 @@ function DeleteConfirm({
   onClose: () => void;
   onDeleted: () => void;
 }) {
+  const { t } = useTranslation();
   const deleteMut = useMutation({
     mutationFn: () => deleteItem(collectionName, itemId),
     onSuccess: () => {
@@ -377,20 +381,20 @@ function DeleteConfirm({
         <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-full bg-red-50 dark:bg-red-500/10">
           <Trash2 size={18} className="text-red-500 dark:text-red-400" />
         </div>
-        <h3 className="mb-1 text-base font-bold text-slate-900 dark:text-slate-100">Delete item?</h3>
+        <h3 className="mb-1 text-base font-bold text-slate-900 dark:text-slate-100">{t("content.deleteItemTitle")}</h3>
         <p className="mb-5 text-sm text-slate-500 dark:text-slate-400">
-          This action is permanent and cannot be undone.
+          {t("content.deletePermanent")}
         </p>
         <div className="flex items-center justify-end gap-2">
           <Button variant="ghost" onClick={onClose}>
-            Cancel
+            {t("common.cancel")}
           </Button>
           <Button
             variant="danger"
             onClick={() => deleteMut.mutate()}
             disabled={deleteMut.isPending}
           >
-            {deleteMut.isPending ? "Deleting…" : "Delete"}
+            {deleteMut.isPending ? t("common.deleting") : t("common.delete")}
           </Button>
         </div>
       </motion.div>
@@ -405,6 +409,7 @@ type PanelState = { open: false } | { open: true; mode: PanelMode };
 type DeleteState = { open: false } | { open: true; itemId: string };
 
 export default function ContentPage() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { collection: collectionName } = useParams({ strict: false }) as {
     collection: string;
@@ -472,7 +477,7 @@ export default function ContentPage() {
               {schema?.display_name ?? collectionName}
             </h1>
             <p className="text-xs text-slate-400">
-              {total} item{total !== 1 ? "s" : ""}
+              {t("content.itemCount", { count: total })}
             </p>
           </div>
         </div>
@@ -486,7 +491,7 @@ export default function ContentPage() {
           }
         >
           <Plus size={15} />
-          Add Item
+          {t("content.addItem")}
         </Button>
       </div>
 
@@ -500,9 +505,9 @@ export default function ContentPage() {
           </div>
         ) : userFields.length === 0 ? (
           <div className="py-16 text-center">
-            <p className="font-medium text-slate-900 dark:text-slate-100">No table columns</p>
+            <p className="font-medium text-slate-900 dark:text-slate-100">{t("content.noTableColumns")}</p>
             <p className="mt-1 text-sm text-slate-400">
-              Mark fields with “Show in table” in the collection editor to display columns here.
+              {t("content.noTableColumnsHint")}
             </p>
           </div>
         ) : (
@@ -515,7 +520,7 @@ export default function ContentPage() {
                       {f.display_name}
                     </th>
                   ))}
-                  <th className="whitespace-nowrap px-5 py-3">Created</th>
+                  <th className="whitespace-nowrap px-5 py-3">{t("common.created")}</th>
                   <th className="w-16 px-5 py-3" />
                 </tr>
               </thead>
@@ -526,7 +531,7 @@ export default function ContentPage() {
                       colSpan={userFields.length + 2}
                       className="py-14 text-center text-slate-400"
                     >
-                      No items yet —{" "}
+                      {t("content.noItems")} —{" "}
                       <button
                         className="text-brand-600 dark:text-brand-300 hover:underline"
                         onClick={() =>
@@ -536,7 +541,7 @@ export default function ContentPage() {
                           })
                         }
                       >
-                        create the first one
+                        {t("content.createFirstOne")}
                       </button>
                     </td>
                   </tr>
@@ -561,7 +566,7 @@ export default function ContentPage() {
                                   : "bg-slate-100 dark:bg-white/5 text-slate-500 dark:text-slate-400"
                               }`}
                             >
-                              {row[f.name] ? "Yes" : "No"}
+                              {row[f.name] ? t("common.yes") : t("common.no")}
                             </span>
                           ) : (
                             String(row[f.name])
@@ -576,7 +581,7 @@ export default function ContentPage() {
                           <button
                             onClick={() => handleEditRow(row)}
                             className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 dark:hover:bg-white/5 hover:text-slate-700 dark:hover:text-slate-100"
-                            title="Edit"
+                            title={t("common.edit")}
                           >
                             <Pencil size={13} />
                           </button>
@@ -585,7 +590,7 @@ export default function ContentPage() {
                               setDelState({ open: true, itemId: toItemId(row.id) })
                             }
                             className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-400 transition hover:bg-red-50 dark:hover:bg-red-500/10 hover:text-red-600 dark:hover:text-red-400"
-                            title="Delete"
+                            title={t("common.delete")}
                           >
                             <Trash2 size={13} />
                           </button>
@@ -697,6 +702,7 @@ function ContentFormBody({
   mode: FormMode;
   initialItem: Record<string, unknown>;
 }) {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
@@ -709,6 +715,13 @@ function ContentFormBody({
     enabled: !!collectionName,
   });
   const schema = liveSchema ?? schemaProp;
+
+  // Relations (cache-shared with the gate) so UUID FK fields render as pickers.
+  const { data: relations } = useQuery({
+    queryKey: ["relations", collectionName],
+    queryFn: () => listRelations(collectionName),
+    enabled: !!collectionName,
+  });
 
   const sections = sortedSections(schema);
   const allUserFields = allFields(schema).filter((f) => !f.is_system);
@@ -759,7 +772,7 @@ function ContentFormBody({
     const errors: Record<string, string> = {};
     for (const f of visibleUserFields) {
       if (f.required && (values[f.name] == null || values[f.name] === "")) {
-        errors[f.name] = `${f.display_name} is required`;
+        errors[f.name] = t("content.fieldRequired", { field: f.display_name });
       }
     }
     setFieldErrors(errors);
@@ -800,8 +813,9 @@ function ContentFormBody({
         </div>
         <div className="flex-1">
           <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100">
-            {isEdit ? "Edit" : "New"} {schema?.display_name ?? collectionName}
-            {isEdit ? "" : " item"}
+            {isEdit
+              ? t("content.editEntity", { name: schema?.display_name ?? collectionName })
+              : t("content.newEntity", { name: schema?.display_name ?? collectionName })}
           </h1>
           <p className="mt-0.5 text-xs text-slate-400">{collectionName}</p>
         </div>
@@ -814,7 +828,7 @@ function ContentFormBody({
               onClick={() => setSortSectionsOpen(true)}
             >
               <ArrowUpDown size={14} />
-              Sort sections
+              {t("content.sortSections")}
             </Button>
           )}
           <LanguageSelector
@@ -837,7 +851,7 @@ function ContentFormBody({
           {allUserFields.length === 0 ? (
             <Card>
               <p className="text-sm text-slate-400">
-                No fields defined for this collection yet. Add fields from the{" "}
+                {t("content.noFieldsAddFrom")}
                 <button
                   type="button"
                   onClick={() =>
@@ -848,7 +862,7 @@ function ContentFormBody({
                   }
                   className="text-brand-600 dark:text-brand-300 hover:underline"
                 >
-                  collection editor
+                  {t("content.collectionEditor")}
                 </button>
                 .
               </p>
@@ -872,7 +886,7 @@ function ContentFormBody({
                   </div>
                   <div className="grid grid-cols-1 gap-5 px-6 py-6 md:grid-cols-2">
                     <FieldGroup
-                      fields={sectionFields}
+                      fields={withRelationOptions(sectionFields, relations ?? [], collectionName)}
                       values={values}
                       fieldErrors={fieldErrors}
                       onChange={handleChange}
@@ -908,7 +922,7 @@ function ContentFormBody({
 
           <div className="flex items-center justify-between rounded-2xl border border-slate-100 dark:border-white/10 bg-white dark:bg-slate-900 px-6 py-4 shadow-card">
             <Button type="button" variant="ghost" onClick={goBack}>
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button
               type="submit"
@@ -916,8 +930,8 @@ function ContentFormBody({
             >
               <Save size={14} />
               {saveMut.isPending
-                ? isEdit ? "Saving…" : "Creating…"
-                : isEdit ? "Save Changes" : "Create Item"}
+                ? isEdit ? t("common.saving") : t("content.creating")
+                : isEdit ? t("content.saveChanges") : t("content.createItem")}
             </Button>
           </div>
       </form>

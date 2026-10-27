@@ -164,6 +164,11 @@ func (h *itemHandler) create(w http.ResponseWriter, r *http.Request) {
 
 	children := h.extractChildren(r.Context(), tenantID, coll, data)
 
+	if err := h.validateWriteGraph(r.Context(), tenantID, coll, data, children); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
 	var item map[string]any
 	var err error
 	if len(children) > 0 {
@@ -296,6 +301,11 @@ func (h *itemHandler) update(w http.ResponseWriter, r *http.Request) {
 	h.hashFields(r.Context(), tenantID, coll, data)
 
 	children := h.extractChildren(r.Context(), tenantID, coll, data)
+
+	if err := h.validateWriteGraph(r.Context(), tenantID, coll, data, children); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
 
 	var item map[string]any
 	if len(children) > 0 {
@@ -623,6 +633,65 @@ func parseDeep(r *http.Request) []string {
 		}
 	}
 	return out
+}
+
+// validateRelationValues checks a write payload against the collection's declared
+// field types and normalizes values Postgres would otherwise reject with a raw
+// 500. For UUID/relation fields: a present-but-empty value becomes NULL (or a
+// clean error when the field is required on a parent row), and a non-UUID string
+// is rejected with a message that names the field. Absent fields are left alone,
+// so partial updates keep working. isChild skips the required check because a
+// child's foreign-key column is injected by the reconcile step, not the client.
+//
+// Returns a user-facing error (mapped to 400 by the caller) or nil. If the
+// collection can't be introspected it returns nil and lets the DB enforce.
+func (h *itemHandler) validateRelationValues(ctx context.Context, tenantID uuid.UUID, coll string, row map[string]any, isChild bool) error {
+	c, err := h.repos.Collection.GetByName(ctx, tenantID, coll)
+	if err != nil || c == nil {
+		return nil
+	}
+	for _, f := range c.AllFields() {
+		if f.Type != collectiondomain.FieldTypeUUID {
+			continue
+		}
+		v, ok := row[f.Name]
+		if !ok {
+			continue
+		}
+		label := f.DisplayName
+		if label == "" {
+			label = f.Name
+		}
+		if v == nil || strings.TrimSpace(fmt.Sprintf("%v", v)) == "" {
+			if f.Required && !isChild {
+				return fmt.Errorf("%s is required", label)
+			}
+			row[f.Name] = nil // empty optional relation → NULL
+			continue
+		}
+		s := strings.TrimSpace(fmt.Sprintf("%v", v))
+		if _, perr := uuid.Parse(s); perr != nil {
+			return fmt.Errorf("%s must be a valid reference", label)
+		}
+		row[f.Name] = s
+	}
+	return nil
+}
+
+// validateWriteGraph validates the parent row and every child row of a write,
+// returning the first user-facing error found (or nil).
+func (h *itemHandler) validateWriteGraph(ctx context.Context, tenantID uuid.UUID, coll string, data map[string]any, children []outbound.ChildReconcile) error {
+	if err := h.validateRelationValues(ctx, tenantID, coll, data, false); err != nil {
+		return err
+	}
+	for _, ch := range children {
+		for _, row := range ch.Rows {
+			if err := h.validateRelationValues(ctx, tenantID, ch.Collection, row, true); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 // extractChildren pulls nested O2M child arrays out of the write payload, based on

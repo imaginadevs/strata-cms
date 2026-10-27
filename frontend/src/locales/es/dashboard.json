@@ -1,0 +1,14 @@
+{
+  "dashboard": {
+    "title": "Panel",
+    "subtitle": "Resumen de tu instancia de CMS",
+    "collections": "Colecciones",
+    "users": "Usuarios",
+    "auditLogs": "Registros de auditoría",
+    "activeNow": "Activos ahora",
+    "recentActivity": "Actividad reciente",
+    "system": "sistema",
+    "noCollections": "Aún no hay colecciones",
+    "noActivity": "Aún no hay actividad"
+  }
+}

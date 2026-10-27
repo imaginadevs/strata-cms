@@ -9,6 +9,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
+import { useTranslation } from "react-i18next";
 import {
   KeyRound, Plus, X, Copy, Check, RefreshCw, Trash2, Ban, AlertTriangle, ShieldCheck,
 } from "lucide-react";
@@ -18,12 +19,12 @@ import type { ApiToken, ApiTokenSecret, ApiTokenPolicy, Collection, PaginatedRes
 
 const ACTIONS = ["read", "create", "update", "delete", "all"] as const;
 const VIRTUAL_RESOURCES = [
-  { value: "cms_users", label: "Users" },
-  { value: "cms_roles", label: "Roles" },
-  { value: "cms_schema", label: "Collection config" },
-  { value: "cms_settings", label: "Settings" },
-  { value: "cms_audit", label: "Audit logs" },
-  { value: "cms_workflows", label: "Workflows" },
+  { value: "cms_users", labelKey: "apiTokens.resUsers" },
+  { value: "cms_roles", labelKey: "apiTokens.resRoles" },
+  { value: "cms_schema", labelKey: "apiTokens.resSchema" },
+  { value: "cms_settings", labelKey: "apiTokens.resSettings" },
+  { value: "cms_audit", labelKey: "apiTokens.resAudit" },
+  { value: "cms_workflows", labelKey: "apiTokens.resWorkflows" },
 ];
 
 function fmtDate(s?: string | null) {
@@ -32,6 +33,7 @@ function fmtDate(s?: string | null) {
 }
 
 export default function ApiTokensPage() {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const [panelOpen, setPanelOpen] = useState(false);
   const [editing, setEditing] = useState<ApiToken | null>(null);
@@ -68,12 +70,12 @@ export default function ApiTokensPage() {
     <div className="mx-auto max-w-5xl px-4 py-6 sm:px-6">
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100">API tokens</h1>
-          <p className="text-sm text-slate-400">Policy-scoped tokens for programmatic access.</p>
+          <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100">{t("apiTokens.title")}</h1>
+          <p className="text-sm text-slate-400">{t("apiTokens.subtitle")}</p>
         </div>
         <Button onClick={() => { setEditing(null); setPanelOpen(true); }}>
           <Plus size={15} className="mr-1.5" />
-          New token
+          {t("apiTokens.newToken")}
         </Button>
       </div>
 
@@ -81,69 +83,69 @@ export default function ApiTokensPage() {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-slate-100 text-left text-xs uppercase tracking-wide text-slate-400 dark:border-white/10">
-              <th className="px-4 py-3 font-semibold">Name</th>
-              <th className="px-4 py-3 font-semibold">Prefix</th>
-              <th className="px-4 py-3 font-semibold">Policies</th>
-              <th className="px-4 py-3 font-semibold">Lifetime</th>
-              <th className="px-4 py-3 font-semibold">Status</th>
+              <th className="px-4 py-3 font-semibold">{t("common.name")}</th>
+              <th className="px-4 py-3 font-semibold">{t("apiTokens.prefix")}</th>
+              <th className="px-4 py-3 font-semibold">{t("apiTokens.policies")}</th>
+              <th className="px-4 py-3 font-semibold">{t("apiTokens.lifetime")}</th>
+              <th className="px-4 py-3 font-semibold">{t("common.status")}</th>
               <th className="px-4 py-3" />
             </tr>
           </thead>
           <tbody>
-            {isLoading && <tr><td colSpan={6} className="px-4 py-8 text-center text-slate-400">Loading…</td></tr>}
+            {isLoading && <tr><td colSpan={6} className="px-4 py-8 text-center text-slate-400">{t("common.loading")}</td></tr>}
             {!isLoading && tokens.length === 0 && (
-              <tr><td colSpan={6} className="px-4 py-8 text-center text-slate-400">No tokens yet.</td></tr>
+              <tr><td colSpan={6} className="px-4 py-8 text-center text-slate-400">{t("apiTokens.empty")}</td></tr>
             )}
-            {tokens.map((t) => (
-              <tr key={t.id} className="border-b border-slate-50 last:border-0 dark:border-white/5">
+            {tokens.map((tk) => (
+              <tr key={tk.id} className="border-b border-slate-50 last:border-0 dark:border-white/5">
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-2.5">
                     <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100 text-slate-500 dark:bg-white/10 dark:text-slate-300">
                       <KeyRound size={15} />
                     </span>
                     <div>
-                      <p className="font-medium text-slate-800 dark:text-slate-100">{t.name}</p>
-                      <p className="text-xs text-slate-400">last used {fmtDate(t.last_used_at)}</p>
+                      <p className="font-medium text-slate-800 dark:text-slate-100">{tk.name}</p>
+                      <p className="text-xs text-slate-400">{t("apiTokens.lastUsed", { date: fmtDate(tk.last_used_at) })}</p>
                     </div>
                   </div>
                 </td>
-                <td className="px-4 py-3 font-mono text-xs text-slate-500 dark:text-slate-400">cms_{t.secret_prefix}_…</td>
+                <td className="px-4 py-3 font-mono text-xs text-slate-500 dark:text-slate-400">cms_{tk.secret_prefix}_…</td>
                 <td className="px-4 py-3">
                   <div className="flex flex-wrap gap-1">
-                    {t.policies.length === 0 && <span className="text-xs text-slate-300 dark:text-slate-600">none</span>}
-                    {t.policies.slice(0, 3).map((p, i) => (
+                    {tk.policies.length === 0 && <span className="text-xs text-slate-300 dark:text-slate-600">{t("common.none")}</span>}
+                    {tk.policies.slice(0, 3).map((p, i) => (
                       <span key={i} className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[11px] text-slate-600 dark:bg-white/10 dark:text-slate-300">
                         {p.collection}:{p.action}
                       </span>
                     ))}
-                    {t.policies.length > 3 && <span className="text-[11px] text-slate-400">+{t.policies.length - 3}</span>}
+                    {tk.policies.length > 3 && <span className="text-[11px] text-slate-400">+{tk.policies.length - 3}</span>}
                   </div>
                 </td>
-                <td className="px-4 py-3 text-slate-500 dark:text-slate-400">{t.lifetime}</td>
+                <td className="px-4 py-3 text-slate-500 dark:text-slate-400">{t(`apiTokens.lifetime_${tk.lifetime}`)}</td>
                 <td className="px-4 py-3">
                   <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
-                    t.revoked
+                    tk.revoked
                       ? "bg-red-50 text-red-600 dark:bg-red-500/15 dark:text-red-300"
                       : "bg-emerald-50 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-300"
                   }`}>
-                    {t.revoked ? "Revoked" : "Active"}
+                    {tk.revoked ? t("apiTokens.revoked") : t("common.active")}
                   </span>
                 </td>
                 <td className="px-4 py-3">
                   <div className="flex items-center justify-end gap-1">
-                    <button type="button" onClick={() => { setEditing(t); setPanelOpen(true); }} title="Edit policies"
+                    <button type="button" onClick={() => { setEditing(tk); setPanelOpen(true); }} title={t("apiTokens.editPolicies")}
                       className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-brand-600 dark:hover:bg-white/10">
                       <ShieldCheck size={14} />
                     </button>
-                    <button type="button" onClick={() => setRotating(t)} title="Rotate" disabled={t.revoked}
+                    <button type="button" onClick={() => setRotating(tk)} title={t("apiTokens.rotate")} disabled={tk.revoked}
                       className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-brand-600 disabled:opacity-30 dark:hover:bg-white/10">
                       <RefreshCw size={14} />
                     </button>
-                    <button type="button" onClick={() => revokeMut.mutate({ id: t.id, revoked: !t.revoked })} title={t.revoked ? "Un-revoke" : "Revoke"}
+                    <button type="button" onClick={() => revokeMut.mutate({ id: tk.id, revoked: !tk.revoked })} title={tk.revoked ? t("apiTokens.unrevoke") : t("apiTokens.revoke")}
                       className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition hover:bg-amber-50 hover:text-amber-600 dark:hover:bg-amber-500/10">
                       <Ban size={14} />
                     </button>
-                    <button type="button" onClick={() => setConfirmDelete(t)} title="Delete"
+                    <button type="button" onClick={() => setConfirmDelete(tk)} title={t("common.delete")}
                       className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-500/10">
                       <Trash2 size={14} />
                     </button>
@@ -170,20 +172,20 @@ export default function ApiTokensPage() {
       <AnimatePresence>
         {rotating && (
           <Backdrop onClose={() => setRotating(null)}>
-            <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">Rotate “{rotating.name}”</h2>
+            <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">{t("apiTokens.rotateTitle", { name: rotating.name })}</h2>
             <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-              A new secret is generated and shown once. Choose how the current secret is retired.
+              {t("apiTokens.rotateDesc")}
             </p>
             <div className="mt-4 space-y-2">
               <button type="button" onClick={() => rotateMut.mutate({ id: rotating.id, mode: "grace" })}
                 className="w-full rounded-xl border border-slate-200 p-3 text-left transition hover:border-brand-400 dark:border-white/10">
-                <p className="text-sm font-medium text-slate-800 dark:text-slate-100">Grace — keep old valid 24h</p>
-                <p className="text-xs text-slate-400">Recommended. Gives integrations a day to switch over.</p>
+                <p className="text-sm font-medium text-slate-800 dark:text-slate-100">{t("apiTokens.graceTitle")}</p>
+                <p className="text-xs text-slate-400">{t("apiTokens.graceDesc")}</p>
               </button>
               <button type="button" onClick={() => rotateMut.mutate({ id: rotating.id, mode: "now" })}
                 className="w-full rounded-xl border border-slate-200 p-3 text-left transition hover:border-red-400 dark:border-white/10">
-                <p className="text-sm font-medium text-slate-800 dark:text-slate-100">Now — revoke old immediately</p>
-                <p className="text-xs text-slate-400">The current secret stops working at once.</p>
+                <p className="text-sm font-medium text-slate-800 dark:text-slate-100">{t("apiTokens.nowTitle")}</p>
+                <p className="text-xs text-slate-400">{t("apiTokens.nowDesc")}</p>
               </button>
             </div>
           </Backdrop>
@@ -194,13 +196,13 @@ export default function ApiTokensPage() {
       <AnimatePresence>
         {confirmDelete && (
           <Backdrop onClose={() => setConfirmDelete(null)}>
-            <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">Delete token?</h2>
+            <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">{t("apiTokens.deleteTitle")}</h2>
             <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-              <span className="font-medium">{confirmDelete.name}</span> will stop working immediately and can't be recovered.
+              <span className="font-medium">{confirmDelete.name}</span>{t("apiTokens.deleteDescSuffix")}
             </p>
             <div className="mt-5 flex justify-end gap-2">
-              <Button variant="ghost" onClick={() => setConfirmDelete(null)}>Cancel</Button>
-              <Button variant="danger" loading={deleteMut.isPending} onClick={() => deleteMut.mutate(confirmDelete.id)}>Delete</Button>
+              <Button variant="ghost" onClick={() => setConfirmDelete(null)}>{t("common.cancel")}</Button>
+              <Button variant="danger" loading={deleteMut.isPending} onClick={() => deleteMut.mutate(confirmDelete.id)}>{t("common.delete")}</Button>
             </div>
           </Backdrop>
         )}
@@ -223,6 +225,7 @@ function Backdrop({ children, onClose }: { children: React.ReactNode; onClose: (
 }
 
 function RevealModal({ data, onClose }: { data: ApiTokenSecret | null; onClose: () => void }) {
+  const { t } = useTranslation();
   const [copied, setCopied] = useState(false);
   return (
     <AnimatePresence>
@@ -230,10 +233,10 @@ function RevealModal({ data, onClose }: { data: ApiTokenSecret | null; onClose: 
         <Backdrop onClose={onClose}>
           <div className="flex items-center gap-2">
             <ShieldCheck size={18} className="text-emerald-500" />
-            <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">Copy your secret now</h2>
+            <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">{t("apiTokens.revealTitle")}</h2>
           </div>
           <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-            This is the only time “{data.token.name}”’s secret is shown. Store it securely — you can't retrieve it later.
+            {t("apiTokens.revealDesc", { name: data.token.name })}
           </p>
           <div className="mt-4 flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-white/10 dark:bg-white/5">
             <code className="flex-1 break-all font-mono text-xs text-slate-800 dark:text-slate-100">{data.secret}</code>
@@ -244,7 +247,7 @@ function RevealModal({ data, onClose }: { data: ApiTokenSecret | null; onClose: 
             </button>
           </div>
           <div className="mt-5 flex justify-end">
-            <Button onClick={onClose}>Done</Button>
+            <Button onClick={onClose}>{t("apiTokens.done")}</Button>
           </div>
         </Backdrop>
       )}
@@ -262,6 +265,7 @@ function TokenPanel({
   onCreated: (res: ApiTokenSecret) => void;
   onSaved: () => void;
 }) {
+  const { t } = useTranslation();
   const isEdit = !!token;
   const [name, setName] = useState("");
   const [lifetime, setLifetime] = useState<"forever" | "monthly">("forever");
@@ -309,7 +313,7 @@ function TokenPanel({
             <div className="flex shrink-0 items-center justify-between border-b border-slate-100 px-6 py-5 dark:border-white/10">
               <h2 className="flex items-center gap-2 text-base font-semibold text-slate-900 dark:text-slate-100">
                 <KeyRound size={17} className="text-slate-400" />
-                {isEdit ? "Edit token" : "New API token"}
+                {isEdit ? t("apiTokens.editToken") : t("apiTokens.newApiToken")}
               </h2>
               <button type="button" onClick={onClose} className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 dark:hover:bg-white/5">
                 <X size={18} />
@@ -318,12 +322,12 @@ function TokenPanel({
 
             <div className="flex-1 space-y-5 overflow-y-auto px-6 py-6">
               <div>
-                <label className="mb-1.5 block text-xs font-medium text-slate-700 dark:text-slate-200">Name <span className="text-red-400">*</span></label>
-                <input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder="CI deploy bot" />
+                <label className="mb-1.5 block text-xs font-medium text-slate-700 dark:text-slate-200">{t("common.name")} <span className="text-red-400">*</span></label>
+                <input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder={t("apiTokens.namePlaceholder")} />
               </div>
 
               <div>
-                <label className="mb-1.5 block text-xs font-medium text-slate-700 dark:text-slate-200">Lifetime</label>
+                <label className="mb-1.5 block text-xs font-medium text-slate-700 dark:text-slate-200">{t("apiTokens.lifetime")}</label>
                 <div className="flex gap-2">
                   {(["forever", "monthly"] as const).map((lt) => (
                     <button key={lt} type="button" onClick={() => setLifetime(lt)}
@@ -332,23 +336,23 @@ function TokenPanel({
                           ? "border-brand-400 bg-brand-50 text-brand-700 dark:bg-brand-500/15 dark:text-brand-300"
                           : "border-slate-200 text-slate-500 hover:bg-slate-50 dark:border-white/10 dark:text-slate-400 dark:hover:bg-white/5"
                       }`}>
-                      {lt}
+                      {t(`apiTokens.lifetime_${lt}`)}
                     </button>
                   ))}
                 </div>
                 <p className="mt-1 text-xs text-slate-400">
                   {lifetime === "monthly"
-                    ? "Auto-rotates every 30 days (24h grace). Admins are emailed 24h before — rotate manually then to capture the new secret."
-                    : "Never auto-rotates. Rotate manually whenever you need to."}
+                    ? t("apiTokens.lifetimeHintMonthly")
+                    : t("apiTokens.lifetimeHintForever")}
                 </p>
               </div>
 
               <div>
                 <div className="mb-1.5 flex items-center justify-between">
-                  <label className="text-xs font-medium text-slate-700 dark:text-slate-200">Policies</label>
+                  <label className="text-xs font-medium text-slate-700 dark:text-slate-200">{t("apiTokens.policies")}</label>
                   <button type="button" onClick={() => setPolicies((p) => [...p, { collection: "*", action: "read" }])}
                     className="flex items-center gap-1 text-xs font-medium text-brand-600 hover:text-brand-700 dark:text-brand-300">
-                    <Plus size={12} /> Add
+                    <Plus size={12} /> {t("common.add")}
                   </button>
                 </div>
                 <div className="space-y-2">
@@ -356,19 +360,19 @@ function TokenPanel({
                     <div key={i} className="flex items-center gap-2">
                       <select value={p.collection} onChange={(e) => setRow(i, { collection: e.target.value })}
                         className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-700 focus:border-brand-400 focus:outline-none dark:border-white/10 dark:bg-white/5 dark:text-slate-200">
-                        <option value="*">★ All resources (*)</option>
-                        <optgroup label="System">
-                          {VIRTUAL_RESOURCES.map((v) => <option key={v.value} value={v.value}>{v.label}</option>)}
+                        <option value="*">{t("apiTokens.allResources")}</option>
+                        <optgroup label={t("apiTokens.groupSystem")}>
+                          {VIRTUAL_RESOURCES.map((v) => <option key={v.value} value={v.value}>{t(v.labelKey)}</option>)}
                         </optgroup>
                         {collections.length > 0 && (
-                          <optgroup label="Collections">
+                          <optgroup label={t("apiTokens.groupCollections")}>
                             {collections.map((c) => <option key={c.id} value={c.name}>{c.display_name} ({c.name})</option>)}
                           </optgroup>
                         )}
                       </select>
                       <select value={p.action} onChange={(e) => setRow(i, { action: e.target.value })}
                         className="w-28 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-700 focus:border-brand-400 focus:outline-none dark:border-white/10 dark:bg-white/5 dark:text-slate-200">
-                        {ACTIONS.map((a) => <option key={a} value={a}>{a}</option>)}
+                        {ACTIONS.map((a) => <option key={a} value={a}>{t(`apiTokens.action_${a}`)}</option>)}
                       </select>
                       <button type="button" onClick={() => setPolicies((prev) => prev.filter((_, j) => j !== i))}
                         className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-slate-300 transition hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-500/10">
@@ -378,12 +382,12 @@ function TokenPanel({
                   ))}
                   {policies.length === 0 && (
                     <p className="rounded-lg border border-dashed border-slate-200 px-3 py-3 text-center text-xs text-slate-400 dark:border-white/10">
-                      No policies — this token can't access anything. Add at least one.
+                      {t("apiTokens.policiesEmpty")}
                     </p>
                   )}
                 </div>
                 <p className="mt-1.5 text-xs text-slate-400">
-                  Each row grants an action on a resource. “All resources” (*) and action “all” are wildcards.
+                  {t("apiTokens.policiesHint")}
                 </p>
               </div>
 
@@ -395,9 +399,9 @@ function TokenPanel({
             </div>
 
             <div className="flex shrink-0 items-center justify-end gap-2 border-t border-slate-100 px-6 py-4 dark:border-white/10">
-              <Button variant="ghost" onClick={onClose}>Cancel</Button>
+              <Button variant="ghost" onClick={onClose}>{t("common.cancel")}</Button>
               <Button onClick={() => { setError(null); mutation.mutate(); }} loading={mutation.isPending} disabled={!name.trim()}>
-                {isEdit ? "Save changes" : "Create token"}
+                {isEdit ? t("apiTokens.saveChanges") : t("apiTokens.createToken")}
               </Button>
             </div>
           </motion.aside>

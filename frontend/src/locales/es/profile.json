@@ -1,0 +1,24 @@
+{
+  "profile": {
+    "title": "Mi perfil",
+    "subtitle": "Actualiza tu nombre, idiomas y contraseña. No requiere permisos de administrador.",
+    "sectionProfile": "Perfil",
+    "firstName": "Nombre",
+    "lastName": "Apellido",
+    "emailLocked": "El correo no se puede cambiar aquí.",
+    "contentLanguage": "Idioma del contenido",
+    "contentLanguageHint": "Idioma predeterminado para crear y ver entradas de contenido.",
+    "interfaceLanguage": "Idioma de la interfaz",
+    "interfaceLanguageHint": "Idioma del propio panel de administración.",
+    "saveProfile": "Guardar perfil",
+    "sectionPassword": "Contraseña",
+    "newPassword": "Nueva contraseña",
+    "confirmPassword": "Confirmar nueva contraseña",
+    "passwordHint": "Mínimo 8 caracteres.",
+    "updatePassword": "Actualizar contraseña",
+    "passwordUpdated": "Contraseña actualizada",
+    "passwordTooShort": "La contraseña debe tener al menos 8 caracteres.",
+    "passwordMismatch": "Las contraseñas no coinciden.",
+    "ssoNote": "Tu cuenta usa SSO. La contraseña la gestiona tu proveedor de identidad."
+  }
+}

@@ -1,4 +1,6 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 import { createPortal } from "react-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useParams } from "@tanstack/react-router";
@@ -61,24 +63,25 @@ const updateField = (coll: string, name: string, data: Partial<UpdateFieldInput>
 
 const SNAKE_RE = /^[a-z][a-z0-9_]*$/;
 
-const createCollectionSchema = z.object({
-  name: z
-    .string()
-    .min(1, "Name is required")
-    .regex(SNAKE_RE, "Use lowercase letters, numbers and underscores. Must start with a letter."),
-  display_name: z.string().min(1, "Display name is required"),
-  type: z.enum(["base", "auth"] as const),
-  color: z.string().optional(),
-  note: z.string().optional(),
-});
+const buildCreateCollectionSchema = (t: TFunction) =>
+  z.object({
+    name: z
+      .string()
+      .min(1, t("collections.nameRequired"))
+      .regex(SNAKE_RE, t("collections.snakeCaseError")),
+    display_name: z.string().min(1, t("collections.displayNameRequired")),
+    type: z.enum(["base", "auth"] as const),
+    color: z.string().optional(),
+    note: z.string().optional(),
+  });
 
-const createFieldSchema = z.object({
+const buildCreateFieldSchema = (t: TFunction) => z.object({
   name: z
     .string()
-    .min(1, "Name is required")
-    .regex(SNAKE_RE, "Use lowercase letters, numbers and underscores."),
-  display_name: z.string().min(1, "Display name is required"),
-  type: z.string().min(1, "Type is required") as z.ZodType<FieldType>,
+    .min(1, t("collections.nameRequired"))
+    .regex(SNAKE_RE, t("collections.snakeCaseShort")),
+  display_name: z.string().min(1, t("collections.displayNameRequired")),
+  type: z.string().min(1, t("collections.typeRequired")) as z.ZodType<FieldType>,
   required:     z.boolean(),
   unique:       z.boolean(),
   hidden:       z.boolean(),
@@ -90,8 +93,8 @@ const createFieldSchema = z.object({
   options: z.record(z.unknown()).optional(),
 });
 
-type CreateCollectionInput = z.infer<typeof createCollectionSchema>;
-type CreateFieldInput = z.infer<typeof createFieldSchema>;
+type CreateCollectionInput = z.infer<ReturnType<typeof buildCreateCollectionSchema>>;
+type CreateFieldInput = z.infer<ReturnType<typeof buildCreateFieldSchema>>;
 
 interface UpdateFieldInput {
   display_name: string;
@@ -107,20 +110,20 @@ interface UpdateFieldInput {
 
 // ── Field type config ─────────────────────────────────────────────────────────
 
-const FIELD_TYPES: { type: FieldType; label: string; Icon: React.ElementType; color: string }[] = [
-  { type: "string",    label: "Text",      Icon: Type,       color: "text-blue-500 dark:text-blue-300 bg-blue-50 dark:bg-blue-500/10" },
-  { type: "text",      label: "Long Text", Icon: FileText,   color: "text-blue-600 dark:text-blue-300 bg-blue-50 dark:bg-blue-500/10" },
-  { type: "integer",   label: "Integer",   Icon: Hash,       color: "text-violet-500 dark:text-violet-300 bg-violet-50 dark:bg-violet-500/10" },
-  { type: "float",     label: "Float",     Icon: Hash,       color: "text-violet-600 dark:text-violet-300 bg-violet-50 dark:bg-violet-500/10" },
-  { type: "boolean",   label: "Boolean",   Icon: ToggleLeft, color: "text-green-500 dark:text-emerald-300 bg-green-50 dark:bg-emerald-500/10" },
-  { type: "date",      label: "Date",      Icon: Calendar,   color: "text-orange-500 dark:text-orange-300 bg-orange-50 dark:bg-orange-500/10" },
-  { type: "datetime",  label: "DateTime",  Icon: Clock,      color: "text-orange-600 dark:text-orange-300 bg-orange-50 dark:bg-orange-500/10" },
-  { type: "json",      label: "JSON",      Icon: Code,       color: "text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-white/5" },
-  { type: "uuid",      label: "UUID",      Icon: Binary,     color: "text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-white/5" },
-  { type: "select",    label: "Select",    Icon: List,       color: "text-amber-500 dark:text-amber-300 bg-amber-50 dark:bg-amber-500/10" },
-  { type: "file",      label: "File",      Icon: Upload,     color: "text-teal-500 dark:text-teal-300 bg-teal-50 dark:bg-teal-500/10" },
-  { type: "ip",        label: "IP",        Icon: Globe,      color: "text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-white/5" },
-  { type: "rich_text", label: "Rich Text", Icon: FileText,   color: "text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-500/10" },
+const FIELD_TYPES: { type: FieldType; Icon: React.ElementType; color: string }[] = [
+  { type: "string",    Icon: Type,       color: "text-blue-500 dark:text-blue-300 bg-blue-50 dark:bg-blue-500/10" },
+  { type: "text",      Icon: FileText,   color: "text-blue-600 dark:text-blue-300 bg-blue-50 dark:bg-blue-500/10" },
+  { type: "integer",   Icon: Hash,       color: "text-violet-500 dark:text-violet-300 bg-violet-50 dark:bg-violet-500/10" },
+  { type: "float",     Icon: Hash,       color: "text-violet-600 dark:text-violet-300 bg-violet-50 dark:bg-violet-500/10" },
+  { type: "boolean",   Icon: ToggleLeft, color: "text-green-500 dark:text-emerald-300 bg-green-50 dark:bg-emerald-500/10" },
+  { type: "date",      Icon: Calendar,   color: "text-orange-500 dark:text-orange-300 bg-orange-50 dark:bg-orange-500/10" },
+  { type: "datetime",  Icon: Clock,      color: "text-orange-600 dark:text-orange-300 bg-orange-50 dark:bg-orange-500/10" },
+  { type: "json",      Icon: Code,       color: "text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-white/5" },
+  { type: "uuid",      Icon: Binary,     color: "text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-white/5" },
+  { type: "select",    Icon: List,       color: "text-amber-500 dark:text-amber-300 bg-amber-50 dark:bg-amber-500/10" },
+  { type: "file",      Icon: Upload,     color: "text-teal-500 dark:text-teal-300 bg-teal-50 dark:bg-teal-500/10" },
+  { type: "ip",        Icon: Globe,      color: "text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-white/5" },
+  { type: "rich_text", Icon: FileText,   color: "text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-500/10" },
 ];
 
 const PRESET_COLORS = [
@@ -151,6 +154,7 @@ export function CollectionDetailPage() {
 // ── Collection list ───────────────────────────────────────────────────────────
 
 function CollectionList() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [filter, setFilter] = useState<"all" | "base" | "auth">("all");
   const [showCreate, setShowCreate] = useState(false);
@@ -166,29 +170,29 @@ function CollectionList() {
     <div className="space-y-5">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Collections</h1>
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">{t("collections.title")}</h1>
           <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-            {collections.length} data model{collections.length !== 1 ? "s" : ""}
+            {t("collections.dataModelCount", { count: collections.length })}
           </p>
         </div>
         <Button onClick={() => setShowCreate(true)}>
           <Plus size={16} />
-          New Collection
+          {t("collections.newCollection")}
         </Button>
       </div>
 
       <div className="flex gap-2">
-        {(["all", "base", "auth"] as const).map((t) => (
+        {(["all", "base", "auth"] as const).map((ft) => (
           <button
-            key={t}
-            onClick={() => setFilter(t)}
+            key={ft}
+            onClick={() => setFilter(ft)}
             className={`rounded-xl px-3 py-1.5 text-xs font-medium capitalize transition ${
-              filter === t
+              filter === ft
                 ? "bg-brand-600 text-white"
                 : "bg-white dark:bg-white/5 text-slate-600 dark:text-slate-300 hover:bg-brand-50 dark:hover:bg-brand-500/15 hover:text-brand-700 dark:hover:text-brand-300 border border-slate-200 dark:border-white/10"
             }`}
           >
-            {t}
+            {ft === "all" ? t("common.all") : t(`collections.typeOption.${ft}`)}
           </button>
         ))}
       </div>
@@ -212,9 +216,9 @@ function CollectionList() {
           <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-50 dark:bg-brand-500/15">
             <Database size={24} className="text-brand-400" />
           </div>
-          <p className="font-medium text-slate-900 dark:text-slate-100">No collections yet</p>
+          <p className="font-medium text-slate-900 dark:text-slate-100">{t("collections.noCollections")}</p>
           <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-            Create your first collection to start building your data model.
+            {t("collections.noCollectionsHint")}
           </p>
         </div>
       ) : (
@@ -222,10 +226,10 @@ function CollectionList() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-slate-100 dark:border-white/10 text-left text-xs font-medium text-slate-400">
-                <th className="px-5 py-3">Collection</th>
-                <th className="px-5 py-3">Type</th>
-                <th className="px-5 py-3">Fields</th>
-                <th className="px-5 py-3 hidden md:table-cell">Note</th>
+                <th className="px-5 py-3">{t("collections.colCollection")}</th>
+                <th className="px-5 py-3">{t("collections.colType")}</th>
+                <th className="px-5 py-3">{t("collections.colFields")}</th>
+                <th className="px-5 py-3 hidden md:table-cell">{t("collections.colNote")}</th>
                 <th className="w-8 px-5 py-3" />
               </tr>
             </thead>
@@ -260,9 +264,9 @@ function CollectionList() {
                     <td className="px-5 py-3.5">
                       <div className="flex flex-wrap gap-1">
                         <span className={`badge ${c.type === "auth" ? "badge-amber" : "badge-blue"}`}>
-                          {c.type}
+                          {t(`collections.typeOption.${c.type}`, { defaultValue: c.type })}
                         </span>
-                        {c.is_system && <span className="badge badge-gray">system</span>}
+                        {c.is_system && <span className="badge badge-gray">{t("collections.system")}</span>}
                       </div>
                     </td>
                     <td className="px-5 py-3.5 text-slate-500 dark:text-slate-400">
@@ -290,6 +294,7 @@ function CollectionList() {
 // ── Collection detail (field editor) ─────────────────────────────────────────
 
 function CollectionDetail({ name, onBack }: { name: string; onBack: () => void }) {
+  const { t } = useTranslation();
   const [addFieldSection, setAddFieldSection] = useState<string | null>(null);
   const [editingSection, setEditingSection] = useState<Section | null>(null);
   const [showCreateSection, setShowCreateSection] = useState(false);
@@ -421,9 +426,9 @@ function CollectionDetail({ name, onBack }: { name: string; onBack: () => void }
           <div className="flex items-center gap-2">
             <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100">{collection.display_name}</h1>
             <span className={`badge ${collection.type === "auth" ? "badge-amber" : "badge-blue"}`}>
-              {collection.type}
+              {t(`collections.typeOption.${collection.type}`, { defaultValue: collection.type })}
             </span>
-            {collection.is_system && <span className="badge badge-gray">system</span>}
+            {collection.is_system && <span className="badge badge-gray">{t("collections.system")}</span>}
           </div>
           <p className="mt-0.5 text-xs text-slate-400">{collection.name}</p>
         </div>
@@ -435,7 +440,7 @@ function CollectionDetail({ name, onBack }: { name: string; onBack: () => void }
             onClick={() => setConfirmDelete(true)}
           >
             <Trash2 size={15} />
-            Delete
+            {t("common.delete")}
           </Button>
         )}
       </div>
@@ -449,8 +454,8 @@ function CollectionDetail({ name, onBack }: { name: string; onBack: () => void }
       {/* Settings section */}
       <div className="rounded-2xl border border-slate-100 dark:border-white/10 bg-white dark:bg-slate-900 shadow-card">
         <div className="border-b border-slate-100 dark:border-white/10 px-5 py-4">
-          <p className="font-semibold text-slate-900 dark:text-slate-100">Settings</p>
-          <p className="text-xs text-slate-400">Collection-level options</p>
+          <p className="font-semibold text-slate-900 dark:text-slate-100">{t("collections.settings")}</p>
+          <p className="text-xs text-slate-400">{t("collections.settingsHint")}</p>
         </div>
         <div className="flex items-center justify-between gap-4 px-5 py-4">
           <div className="flex items-start gap-3">
@@ -462,10 +467,10 @@ function CollectionDetail({ name, onBack }: { name: string; onBack: () => void }
                 htmlFor="collection-hidden"
                 className="text-sm font-medium text-slate-800 dark:text-slate-100"
               >
-                Hidden
+                {t("collections.hidden")}
               </label>
               <p className="text-xs text-slate-400">
-                Hide this collection from navigation and content listings.
+                {t("collections.hiddenHint")}
               </p>
             </div>
           </div>
@@ -490,30 +495,29 @@ function CollectionDetail({ name, onBack }: { name: string; onBack: () => void }
       {/* Sections + fields */}
       <div className="flex items-center justify-between gap-3">
         <div>
-          <p className="font-semibold text-slate-900 dark:text-slate-100">Sections</p>
+          <p className="font-semibold text-slate-900 dark:text-slate-100">{t("collections.sections")}</p>
           <p className="text-xs text-slate-400">
-            {sections.length} section{sections.length !== 1 ? "s" : ""} · {userFields.length} custom
-            field{userFields.length !== 1 ? "s" : ""}
-            {systemFields.length > 0 ? ` · ${systemFields.length} system` : ""}
+            {t("collections.sectionCount", { count: sections.length })} · {t("collections.customFieldCount", { count: userFields.length })}
+            {systemFields.length > 0 ? ` · ${t("collections.systemCount", { count: systemFields.length })}` : ""}
           </p>
         </div>
         <div className="flex items-center gap-2">
           {sections.length > 1 && (
             <Button size="sm" variant="outline" onClick={() => setSortSectionsOpen(true)}>
               <ArrowUpDown size={14} />
-              Sort
+              {t("collections.sort")}
             </Button>
           )}
           <Button size="sm" variant="outline" onClick={() => setShowCreateSection(true)}>
             <Plus size={14} />
-            Add Section
+            {t("collections.addSection")}
           </Button>
         </div>
       </div>
 
       {sections.length === 0 ? (
         <div className="rounded-2xl border border-slate-100 dark:border-white/10 bg-white dark:bg-slate-900 py-12 text-center text-sm text-slate-400 shadow-card">
-          No sections yet
+          {t("collections.noSections")}
         </div>
       ) : (
         <div className="space-y-4">
@@ -533,14 +537,14 @@ function CollectionDetail({ name, onBack }: { name: string; onBack: () => void }
                       </p>
                       <span className="font-mono text-[11px] text-slate-400">{section.name}</span>
                       {hasVisibility && (
-                        <span className="badge badge-blue">conditional</span>
+                        <span className="badge badge-blue">{t("collections.conditional")}</span>
                       )}
                     </div>
                     {section.note ? (
                       <p className="mt-0.5 text-xs text-slate-400">{section.note}</p>
                     ) : (
                       <p className="mt-0.5 text-xs text-slate-400">
-                        {sectionFields.length} field{sectionFields.length !== 1 ? "s" : ""}
+                        {t("collections.fieldCount", { count: sectionFields.length })}
                       </p>
                     )}
                   </div>
@@ -551,18 +555,18 @@ function CollectionDetail({ name, onBack }: { name: string; onBack: () => void }
                       onClick={() => setEditingSection(section)}
                     >
                       <Pencil size={13} />
-                      Edit
+                      {t("common.edit")}
                     </Button>
                     <Button size="sm" onClick={() => setAddFieldSection(section.name)}>
                       <Plus size={14} />
-                      Add Field
+                      {t("collections.addField")}
                     </Button>
                   </div>
                 </div>
 
                 {sectionFields.length === 0 ? (
                   <div className="py-10 text-center text-sm text-slate-400">
-                    No fields in this section yet
+                    {t("collections.noFieldsInSection")}
                   </div>
                 ) : (
                   <DndContext
@@ -578,11 +582,11 @@ function CollectionDetail({ name, onBack }: { name: string; onBack: () => void }
                         <thead>
                           <tr className="text-left text-xs font-medium text-slate-400">
                             <th className="w-8 py-3 pl-3" />
-                            <th className="px-4 py-3">Name</th>
-                            <th className="px-4 py-3">Display Name</th>
-                            <th className="px-4 py-3">Type</th>
-                            <th className="px-4 py-3">Required</th>
-                            <th className="px-4 py-3">Unique</th>
+                            <th className="px-4 py-3">{t("common.name")}</th>
+                            <th className="px-4 py-3">{t("collections.displayName")}</th>
+                            <th className="px-4 py-3">{t("collections.colType")}</th>
+                            <th className="px-4 py-3">{t("common.required")}</th>
+                            <th className="px-4 py-3">{t("collections.unique")}</th>
                             <th className="w-10 px-4 py-3" />
                           </tr>
                         </thead>
@@ -646,9 +650,9 @@ function CollectionDetail({ name, onBack }: { name: string; onBack: () => void }
       {/* Delete collection confirm — only non-system */}
       <ConfirmDialog
         open={confirmDelete}
-        title={`Delete "${collection.display_name}"?`}
-        description="This will permanently drop the database table and all its data. This action cannot be undone."
-        confirmLabel="Delete collection"
+        title={t("collections.deleteCollectionTitle", { name: collection.display_name })}
+        description={t("collections.deleteCollectionDesc")}
+        confirmLabel={t("collections.deleteCollectionConfirm")}
         onConfirm={() => deleteMutation.mutate()}
         onCancel={() => setConfirmDelete(false)}
         loading={deleteMutation.isPending}
@@ -669,6 +673,7 @@ function SortableFieldRow({
   collectionName: string;
   isReordering?: boolean;
 }) {
+  const { t } = useTranslation();
   const {
     attributes,
     listeners,
@@ -696,7 +701,7 @@ function SortableFieldRow({
     },
   });
 
-  const typeConfig = FIELD_TYPES.find((t) => t.type === f.type);
+  const typeConfig = FIELD_TYPES.find((ft) => ft.type === f.type);
 
   return (
     <tr
@@ -711,7 +716,7 @@ function SortableFieldRow({
         {isReordering ? (
           <span
             className="flex h-6 w-6 items-center justify-center"
-            title="Saving order…"
+            title={t("collections.savingOrder")}
           >
             <span className="h-3 w-3 animate-spin rounded-full border border-slate-200 dark:border-white/10 border-t-slate-400" />
           </span>
@@ -721,7 +726,7 @@ function SortableFieldRow({
             className="flex h-6 w-6 cursor-grab items-center justify-center rounded text-slate-300 hover:text-slate-500 dark:hover:text-slate-300 active:cursor-grabbing"
             {...attributes}
             {...listeners}
-            title="Drag to reorder"
+            title={t("collections.dragToReorder")}
           >
             <GripVertical size={14} />
           </button>
@@ -747,14 +752,14 @@ function SortableFieldRow({
       </td>
       <td className="px-4 py-3">
         {f.required ? (
-          <span className="badge badge-red">yes</span>
+          <span className="badge badge-red">{t("common.yes").toLowerCase()}</span>
         ) : (
           <span className="text-xs text-slate-300">—</span>
         )}
       </td>
       <td className="px-4 py-3">
         {f.unique ? (
-          <span className="badge badge-blue">yes</span>
+          <span className="badge badge-blue">{t("common.yes").toLowerCase()}</span>
         ) : (
           <span className="text-xs text-slate-300">—</span>
         )}
@@ -768,14 +773,14 @@ function SortableFieldRow({
               <button
                 onClick={() => setShowEdit(true)}
                 className="rounded-lg p-1.5 text-slate-300 transition hover:bg-brand-50 dark:hover:bg-brand-500/15 hover:text-brand-600 dark:hover:text-brand-300"
-                title="Edit field"
+                title={t("collections.editField")}
               >
                 <Pencil size={13} />
               </button>
               <button
                 onClick={() => setConfirm(true)}
                 className="rounded-lg p-1.5 text-slate-300 transition hover:bg-red-50 dark:hover:bg-red-500/10 hover:text-red-500 dark:hover:text-red-400"
-                title="Delete field"
+                title={t("collections.deleteField")}
               >
                 <Trash2 size={14} />
               </button>
@@ -788,9 +793,9 @@ function SortableFieldRow({
             />
             <ConfirmDialog
               open={confirm}
-              title={`Delete field "${f.name}"?`}
-              description="This will drop the column from the database. Any stored data in this column will be lost."
-              confirmLabel="Delete field"
+              title={t("collections.deleteFieldTitle", { name: f.name })}
+              description={t("collections.deleteFieldDesc")}
+              confirmLabel={t("collections.deleteField")}
               onConfirm={() => deleteMutation.mutate()}
               onCancel={() => setConfirm(false)}
               loading={deleteMutation.isPending}
@@ -799,7 +804,7 @@ function SortableFieldRow({
           </>
         ) : (
           /* System field — lock icon instead, always visible */
-          <span className="flex justify-center text-slate-200" title="System field — cannot be deleted">
+          <span className="flex justify-center text-slate-200" title={t("collections.systemFieldLocked")}>
             <Lock size={13} />
           </span>
         )}
@@ -810,13 +815,6 @@ function SortableFieldRow({
 
 // ── Relations section ─────────────────────────────────────────────────────────
 
-const RELATION_TYPE_LABELS: Record<RelationType, string> = {
-  many_to_one:  "Many → One",
-  one_to_many:  "One → Many",
-  many_to_many: "Many ↔ Many",
-  one_to_one:   "One → One",
-};
-
 function RelationsSection({
   collectionName,
   allCollections,
@@ -824,6 +822,7 @@ function RelationsSection({
   collectionName: string;
   allCollections: Collection[];
 }) {
+  const { t } = useTranslation();
   const [showAdd, setShowAdd] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const queryClient = useQueryClient();
@@ -849,29 +848,29 @@ function RelationsSection({
     <div className="rounded-2xl border border-slate-100 dark:border-white/10 bg-white dark:bg-slate-900 shadow-card">
       <div className="flex items-center justify-between border-b border-slate-100 dark:border-white/10 px-5 py-4">
         <div>
-          <p className="font-semibold text-slate-900 dark:text-slate-100">Relations</p>
+          <p className="font-semibold text-slate-900 dark:text-slate-100">{t("collections.relations")}</p>
           <p className="text-xs text-slate-400">
-            {relations.length} relation{relations.length !== 1 ? "s" : ""}
+            {t("collections.relationCount", { count: relations.length })}
           </p>
         </div>
         <Button size="sm" onClick={() => setShowAdd(true)}>
           <Plus size={14} />
-          Add Relation
+          {t("collections.addRelation")}
         </Button>
       </div>
 
       {relations.length === 0 ? (
         <div className="py-10 text-center text-sm text-slate-400">
-          No relations yet — link this collection to another
+          {t("collections.noRelations")}
         </div>
       ) : (
         <table className="w-full text-sm">
           <thead>
             <tr className="text-left text-xs font-medium text-slate-400">
-              <th className="px-5 py-3">Type</th>
-              <th className="px-5 py-3">Related Collection</th>
-              <th className="px-5 py-3">Field / Junction</th>
-              <th className="px-5 py-3">On Delete</th>
+              <th className="px-5 py-3">{t("collections.colType")}</th>
+              <th className="px-5 py-3">{t("collections.colRelatedCollection")}</th>
+              <th className="px-5 py-3">{t("collections.colFieldJunction")}</th>
+              <th className="px-5 py-3">{t("collections.onDelete")}</th>
               <th className="w-10 px-5 py-3" />
             </tr>
           </thead>
@@ -891,19 +890,19 @@ function RelationsSection({
                   <td className="px-5 py-3">
                     <span className="inline-flex items-center gap-1.5 rounded-lg bg-violet-50 dark:bg-violet-500/10 px-2 py-1 text-xs font-medium text-violet-700 dark:text-violet-300">
                       <ArrowLeftRight size={11} />
-                      {RELATION_TYPE_LABELS[rel.type]}
+                      {t(`collections.relType.${rel.type}`)}
                     </span>
                   </td>
                   <td className="px-5 py-3 font-medium text-slate-700 dark:text-slate-200">{relatedColl}</td>
                   <td className="px-5 py-3 font-mono text-xs text-slate-500 dark:text-slate-400">{fieldOrJunction}</td>
                   <td className="px-5 py-3 text-xs capitalize text-slate-400">
-                    {rel.on_delete.replace("_", " ")}
+                    {t(`collections.onDeleteOption.${rel.on_delete}`, { defaultValue: rel.on_delete.replace("_", " ") })}
                   </td>
                   <td className="px-5 py-3 text-right">
                     <button
                       onClick={() => setConfirmDeleteId(rel.id)}
                       className="rounded-lg p-1.5 text-slate-300 opacity-0 transition hover:bg-red-50 dark:hover:bg-red-500/10 hover:text-red-500 dark:hover:text-red-400 group-hover:opacity-100"
-                      title="Remove relation"
+                      title={t("collections.removeRelation")}
                     >
                       <Trash2 size={14} />
                     </button>
@@ -929,9 +928,9 @@ function RelationsSection({
 
       <ConfirmDialog
         open={confirmDeleteId !== null}
-        title="Remove relation?"
-        description="This will drop the foreign key column (or junction table) from the database. Any data in that column will be permanently lost."
-        confirmLabel="Remove relation"
+        title={t("collections.removeRelationTitle")}
+        description={t("collections.removeRelationDesc")}
+        confirmLabel={t("collections.removeRelation")}
         onConfirm={() => {
           if (confirmDeleteId) deleteMut.mutate(confirmDeleteId);
           setConfirmDeleteId(null);
@@ -959,6 +958,7 @@ function AddRelationPanel({
   onClose: () => void;
   onCreated: () => void;
 }) {
+  const { t } = useTranslation();
   const [relType, setRelType] = useState<RelationType>("many_to_one");
   const [relatedCollection, setRelatedCollection] = useState("");
   const [fieldName, setFieldName] = useState("");
@@ -979,7 +979,7 @@ function AddRelationPanel({
   // Global system tables that live outside the tenant schema but can be referenced.
   // These are always shown regardless of what the collections API returns.
   const GLOBAL_TARGETS = [
-    { name: "users", label: "Users (system)" },
+    { name: "users", label: t("collections.usersSystem") },
   ];
 
   // Load the related collection's fields so the user can pick which one is the
@@ -990,7 +990,7 @@ function AddRelationPanel({
     enabled:
       !!relatedCollection &&
       needsDisplayField &&
-      !GLOBAL_TARGETS.some((t) => t.name === relatedCollection),
+      !GLOBAL_TARGETS.some((g) => g.name === relatedCollection),
   });
   const relatedFields = relatedColl
     ? allFields(relatedColl).filter((f) => !f.hidden && f.type !== "relation")
@@ -1052,12 +1052,13 @@ function AddRelationPanel({
     onError: (e: Error) => setServerError(e.message),
   });
 
-  const RELATION_TYPES: { type: RelationType; label: string; desc: string }[] = [
-    { type: "many_to_one",  label: "Many → One",  desc: `Many ${collectionName} items reference one in the related collection` },
-    { type: "one_to_many",  label: "One → Many",  desc: `One ${collectionName} item is referenced by many in the related collection` },
-    { type: "many_to_many", label: "Many ↔ Many", desc: "A junction table links items from both collections" },
-    { type: "one_to_one",   label: "One → One",   desc: `Each ${collectionName} item maps to exactly one in the related collection` },
-  ];
+  const RELATION_TYPES: { type: RelationType; label: string; desc: string }[] = (
+    ["many_to_one", "one_to_many", "many_to_many", "one_to_one"] as const
+  ).map((type) => ({
+    type,
+    label: t(`collections.relType.${type}`),
+    desc: t(`collections.relTypeDesc.${type}`, { name: collectionName }),
+  }));
 
   const panel = (
     <AnimatePresence>
@@ -1079,7 +1080,7 @@ function AddRelationPanel({
             {/* Header */}
             <div className="flex shrink-0 items-center justify-between border-b border-slate-100 dark:border-white/10 px-6 py-5">
               <div>
-                <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">Add Relation</h2>
+                <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">{t("collections.addRelation")}</h2>
                 <p className="mt-0.5 text-xs text-slate-400">{collectionName}</p>
               </div>
               <button type="button" onClick={onClose}
@@ -1094,7 +1095,7 @@ function AddRelationPanel({
               {/* Relation type */}
               <div>
                 <label className="mb-2 block text-xs font-medium text-slate-700 dark:text-slate-200">
-                  Relation Type <span className="text-red-400">*</span>
+                  {t("collections.relationType")} <span className="text-red-400">*</span>
                 </label>
                 <div className="space-y-2">
                   {RELATION_TYPES.map(({ type, label, desc }) => (
@@ -1120,21 +1121,21 @@ function AddRelationPanel({
               {/* Related collection */}
               <div>
                 <label className="mb-1.5 block text-xs font-medium text-slate-700 dark:text-slate-200">
-                  Related Collection <span className="text-red-400">*</span>
+                  {t("collections.relatedCollection")} <span className="text-red-400">*</span>
                 </label>
                 <select
                   className="w-full rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2 text-sm text-slate-800 dark:text-slate-100 focus:border-brand-400 dark:focus:border-brand-500/60 focus:outline-none focus:ring-2 focus:ring-brand-100 dark:focus:ring-brand-500/20"
                   value={relatedCollection}
                   onChange={(e) => handleRelatedChange(e.target.value)}
                 >
-                  <option value="">— choose a collection —</option>
-                  <optgroup label="System">
+                  <option value="">{t("collections.chooseCollection")}</option>
+                  <optgroup label={t("collections.groupSystem")}>
                     {GLOBAL_TARGETS.map((t) => (
                       <option key={t.name} value={t.name}>{t.label}</option>
                     ))}
                   </optgroup>
                   {otherCollections.length > 0 && (
-                    <optgroup label="Collections">
+                    <optgroup label={t("collections.groupCollections")}>
                       {otherCollections.map((c) => (
                         <option key={c.id} value={c.name}>
                           {c.display_name} ({c.name})
@@ -1150,7 +1151,7 @@ function AddRelationPanel({
                 <>
                   <div>
                     <label className="mb-1.5 block text-xs font-medium text-slate-700 dark:text-slate-200">
-                      Foreign Key Field <span className="text-red-400">*</span>
+                      {t("collections.fkField")} <span className="text-red-400">*</span>
                     </label>
                     <input
                       className="input font-mono text-sm"
@@ -1160,25 +1161,25 @@ function AddRelationPanel({
                     />
                     <p className="mt-1 text-xs text-slate-400">
                       {relType === "one_to_many"
-                        ? `UUID column added to the "${relatedCollection || "related"}" table`
-                        : `UUID column added to the "${collectionName}" table`}
+                        ? t("collections.fkHintRelated", { table: relatedCollection || t("collections.relatedFallback") })
+                        : t("collections.fkHintOwn", { table: collectionName })}
                     </p>
                   </div>
                   <div>
                     <label className="mb-1.5 block text-xs font-medium text-slate-700 dark:text-slate-200">
-                      Display Name
+                      {t("collections.displayName")}
                     </label>
                     <input
                       className="input"
                       value={displayName}
                       onChange={(e) => setDisplayName(e.target.value)}
-                      placeholder="Category"
+                      placeholder={t("collections.placeholderCategory")}
                     />
                   </div>
                   {needsDisplayField && relatedFields.length > 0 && (
                     <div>
                       <label className="mb-1.5 block text-xs font-medium text-slate-700 dark:text-slate-200">
-                        Display Field
+                        {t("collections.displayField")}
                       </label>
                       <select
                         className="w-full rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2 text-sm text-slate-800 dark:text-slate-100 focus:border-brand-400 dark:focus:border-brand-500/60 focus:outline-none focus:ring-2 focus:ring-brand-100 dark:focus:ring-brand-500/20"
@@ -1192,7 +1193,7 @@ function AddRelationPanel({
                         ))}
                       </select>
                       <p className="mt-1 text-xs text-slate-400">
-                        Which field of “{relatedCollection}” to show as the label instead of the UUID
+                        {t("collections.displayFieldHint", { name: relatedCollection })}
                       </p>
                     </div>
                   )}
@@ -1203,16 +1204,16 @@ function AddRelationPanel({
               {needsJunction && (
                 <div>
                   <label className="mb-1.5 block text-xs font-medium text-slate-700 dark:text-slate-200">
-                    Junction Table
+                    {t("collections.junctionTable")}
                   </label>
                   <input
                     className="input font-mono text-sm"
                     value={junctionTable}
                     onChange={(e) => setJunctionTable(e.target.value)}
-                    placeholder={`${collectionName}_${relatedCollection || "other"}`}
+                    placeholder={`${collectionName}_${relatedCollection || t("collections.otherFallback")}`}
                   />
                   <p className="mt-1 text-xs text-slate-400">
-                    Auto-generated as {collectionName}_{relatedCollection || "related"} if left blank
+                    {t("collections.junctionHint", { name: `${collectionName}_${relatedCollection || t("collections.relatedFallback")}` })}
                   </p>
                 </div>
               )}
@@ -1236,9 +1237,9 @@ function AddRelationPanel({
                     />
                   </button>
                   <div>
-                    <p className="text-sm font-medium text-slate-800 dark:text-slate-100">Required</p>
+                    <p className="text-sm font-medium text-slate-800 dark:text-slate-100">{t("common.required")}</p>
                     <p className="text-xs text-slate-400">
-                      Column will be <span className="font-mono">NOT NULL</span> — every item must reference a related record
+                      {t("collections.requiredHintBefore")} <span className="font-mono">NOT NULL</span> {t("collections.requiredHintAfter")}
                     </p>
                   </div>
                 </label>
@@ -1248,7 +1249,7 @@ function AddRelationPanel({
               {needsField && (
                 <div>
                   <label className="mb-1.5 block text-xs font-medium text-slate-700 dark:text-slate-200">
-                    On Delete
+                    {t("collections.onDelete")}
                   </label>
                   <div className="flex gap-2">
                     {(["set_null", "cascade", "restrict"] as const).map((v) => {
@@ -1259,7 +1260,7 @@ function AddRelationPanel({
                           type="button"
                           disabled={disabled}
                           onClick={() => !disabled && setOnDelete(v)}
-                          title={disabled ? "Cannot set null on a required (NOT NULL) column" : undefined}
+                          title={disabled ? t("collections.setNullDisabled") : undefined}
                           className={`flex-1 rounded-xl border py-2 text-xs font-medium transition ${
                             onDelete === v
                               ? "border-brand-400 bg-brand-50 dark:bg-brand-500/15 text-brand-700 dark:text-brand-300"
@@ -1268,15 +1269,13 @@ function AddRelationPanel({
                               : "border-slate-200 dark:border-white/10 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-white/5"
                           }`}
                         >
-                          {v.replace("_", " ")}
+                          {t(`collections.onDeleteOption.${v}`)}
                         </button>
                       );
                     })}
                   </div>
                   <p className="mt-1.5 text-xs text-slate-400">
-                    {onDelete === "set_null" && "Set the FK to NULL when the referenced row is deleted"}
-                    {onDelete === "cascade" && "Delete this row when the referenced row is deleted"}
-                    {onDelete === "restrict" && "Prevent deleting the referenced row while references exist"}
+                    {t(`collections.onDeleteHint.${onDelete}`)}
                   </p>
                 </div>
               )}
@@ -1291,7 +1290,7 @@ function AddRelationPanel({
 
             {/* Footer */}
             <div className="flex shrink-0 items-center justify-end gap-2 border-t border-slate-100 dark:border-white/10 px-6 py-4">
-              <Button type="button" variant="ghost" onClick={onClose}>Cancel</Button>
+              <Button type="button" variant="ghost" onClick={onClose}>{t("common.cancel")}</Button>
               <Button
                 onClick={() => { setServerError(null); mutation.mutate(); }}
                 disabled={
@@ -1300,7 +1299,7 @@ function AddRelationPanel({
                   (needsField && !fieldName)
                 }
               >
-                {mutation.isPending ? "Creating…" : "Create Relation"}
+                {mutation.isPending ? t("collections.creating") : t("collections.createRelation")}
               </Button>
             </div>
           </motion.aside>
@@ -1314,11 +1313,6 @@ function AddRelationPanel({
 
 // ── Indexes section ───────────────────────────────────────────────────────────
 
-const INDEX_TYPE_LABELS: Record<IndexType, string> = {
-  btree:    "B-tree",
-  fulltext: "Full-text",
-};
-
 const INDEX_TYPE_COLORS: Record<IndexType, string> = {
   btree:    "bg-sky-50 dark:bg-sky-500/10 text-sky-700 dark:text-sky-300",
   fulltext: "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
@@ -1331,6 +1325,7 @@ function IndexesSection({
   collectionName: string;
   fields: Field[];
 }) {
+  const { t } = useTranslation();
   const [showAdd, setShowAdd] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const queryClient = useQueryClient();
@@ -1355,28 +1350,28 @@ function IndexesSection({
     <div className="rounded-2xl border border-slate-100 dark:border-white/10 bg-white dark:bg-slate-900 shadow-card">
       <div className="flex items-center justify-between border-b border-slate-100 dark:border-white/10 px-5 py-4">
         <div>
-          <p className="font-semibold text-slate-900 dark:text-slate-100">Indexes</p>
+          <p className="font-semibold text-slate-900 dark:text-slate-100">{t("collections.indexes")}</p>
           <p className="text-xs text-slate-400">
-            {indexes.length} index{indexes.length !== 1 ? "es" : ""}
+            {t("collections.indexCount", { count: indexes.length })}
           </p>
         </div>
         <Button size="sm" onClick={() => setShowAdd(true)}>
           <Plus size={14} />
-          Add Index
+          {t("collections.addIndex")}
         </Button>
       </div>
 
       {indexes.length === 0 ? (
         <div className="py-10 text-center text-sm text-slate-400">
-          No indexes yet — add one to speed up queries on this collection
+          {t("collections.noIndexes")}
         </div>
       ) : (
         <table className="w-full text-sm">
           <thead>
             <tr className="text-left text-xs font-medium text-slate-400">
-              <th className="px-5 py-3">Name</th>
-              <th className="px-5 py-3">Type</th>
-              <th className="px-5 py-3">Fields</th>
+              <th className="px-5 py-3">{t("common.name")}</th>
+              <th className="px-5 py-3">{t("collections.colType")}</th>
+              <th className="px-5 py-3">{t("collections.colFields")}</th>
               <th className="w-10 px-5 py-3" />
             </tr>
           </thead>
@@ -1386,7 +1381,7 @@ function IndexesSection({
                 <td className="px-5 py-3 font-mono text-xs text-slate-600 dark:text-slate-300">{idx.name}</td>
                 <td className="px-5 py-3">
                   <span className={`inline-flex items-center rounded-lg px-2 py-1 text-xs font-medium ${INDEX_TYPE_COLORS[idx.type]}`}>
-                    {INDEX_TYPE_LABELS[idx.type]}
+                    {t(`collections.indexType.${idx.type}`)}
                   </span>
                 </td>
                 <td className="px-5 py-3">
@@ -1402,7 +1397,7 @@ function IndexesSection({
                   <button
                     onClick={() => setConfirmDeleteId(idx.id)}
                     className="rounded-lg p-1.5 text-slate-300 opacity-0 transition hover:bg-red-50 dark:hover:bg-red-500/10 hover:text-red-500 dark:hover:text-red-400 group-hover:opacity-100"
-                    title="Drop index"
+                    title={t("collections.dropIndex")}
                   >
                     <Trash2 size={14} />
                   </button>
@@ -1426,9 +1421,9 @@ function IndexesSection({
 
       <ConfirmDialog
         open={confirmDeleteId !== null}
-        title="Drop index?"
-        description="This removes the index from the database. The data itself is not affected, but queries relying on this index may become slower."
-        confirmLabel="Drop index"
+        title={t("collections.dropIndexTitle")}
+        description={t("collections.dropIndexDesc")}
+        confirmLabel={t("collections.dropIndex")}
         onConfirm={() => {
           if (confirmDeleteId) deleteMut.mutate(confirmDeleteId);
           setConfirmDeleteId(null);
@@ -1456,6 +1451,7 @@ function AddIndexPanel({
   onClose: () => void;
   onCreated: () => void;
 }) {
+  const { t } = useTranslation();
   const [indexType, setIndexType] = useState<IndexType>("btree");
   const [selectedFields, setSelectedFields] = useState<string[]>([]);
   const [indexName, setIndexName] = useState("");
@@ -1480,18 +1476,13 @@ function AddIndexPanel({
     onError: (e: Error) => setServerError(e.message),
   });
 
-  const INDEX_TYPE_OPTIONS: { type: IndexType; label: string; desc: string }[] = [
-    {
-      type: "btree",
-      label: "B-tree",
-      desc: "Standard index for filtering, sorting, and range queries. Works on any field type. Use multiple fields to create a composite index.",
-    },
-    {
-      type: "fulltext",
-      label: "Full-text",
-      desc: "GIN index using to_tsvector. Enables fast keyword search across one or more text fields.",
-    },
-  ];
+  const INDEX_TYPE_OPTIONS: { type: IndexType; label: string; desc: string }[] = (
+    ["btree", "fulltext"] as const
+  ).map((type) => ({
+    type,
+    label: t(`collections.indexType.${type}`),
+    desc: t(`collections.indexTypeDesc.${type}`),
+  }));
 
   const panel = (
     <AnimatePresence>
@@ -1512,7 +1503,7 @@ function AddIndexPanel({
           >
             <div className="flex shrink-0 items-center justify-between border-b border-slate-100 dark:border-white/10 px-6 py-5">
               <div>
-                <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">Add Index</h2>
+                <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">{t("collections.addIndex")}</h2>
                 <p className="mt-0.5 text-xs text-slate-400">{collectionName}</p>
               </div>
               <button type="button" onClick={onClose}
@@ -1524,7 +1515,7 @@ function AddIndexPanel({
             <div className="flex-1 space-y-5 overflow-y-auto px-6 py-6">
               <div>
                 <label className="mb-2 block text-xs font-medium text-slate-700 dark:text-slate-200">
-                  Index Type <span className="text-red-400">*</span>
+                  {t("collections.indexTypeLabel")} <span className="text-red-400">*</span>
                 </label>
                 <div className="space-y-2">
                   {INDEX_TYPE_OPTIONS.map(({ type, label, desc }) => (
@@ -1549,13 +1540,13 @@ function AddIndexPanel({
 
               <div>
                 <label className="mb-2 block text-xs font-medium text-slate-700 dark:text-slate-200">
-                  Fields <span className="text-red-400">*</span>
+                  {t("collections.colFields")} <span className="text-red-400">*</span>
                   {indexType === "btree" && selectedFields.length > 1 && (
-                    <span className="ml-1.5 font-normal text-slate-400">(order matters for composite)</span>
+                    <span className="ml-1.5 font-normal text-slate-400">{t("collections.orderMatters")}</span>
                   )}
                 </label>
                 {fields.length === 0 ? (
-                  <p className="text-xs text-slate-400">No fields available</p>
+                  <p className="text-xs text-slate-400">{t("collections.noFieldsAvailable")}</p>
                 ) : (
                   <div className="space-y-1.5 rounded-xl border border-slate-100 dark:border-white/10 bg-slate-50 dark:bg-white/5 px-3 py-3">
                     {fields.map((f) => {
@@ -1588,14 +1579,14 @@ function AddIndexPanel({
                 )}
                 {indexType === "fulltext" && (
                   <p className="mt-1.5 text-xs text-slate-400">
-                    Tip: pick <span className="font-mono">text</span> or <span className="font-mono">rich_text</span> fields for best results.
+                    {t("collections.fulltextTipBefore")} <span className="font-mono">text</span> {t("collections.fulltextTipMiddle")} <span className="font-mono">rich_text</span> {t("collections.fulltextTipAfter")}
                   </p>
                 )}
               </div>
 
               <div>
                 <label className="mb-1.5 block text-xs font-medium text-slate-700 dark:text-slate-200">
-                  Name <span className="font-normal text-slate-400">(auto-generated if blank)</span>
+                  {t("common.name")} <span className="font-normal text-slate-400">{t("collections.autoGeneratedIfBlank")}</span>
                 </label>
                 <input
                   className="input font-mono text-sm"
@@ -1618,12 +1609,12 @@ function AddIndexPanel({
             </div>
 
             <div className="flex shrink-0 items-center justify-end gap-2 border-t border-slate-100 dark:border-white/10 px-6 py-4">
-              <Button type="button" variant="ghost" onClick={onClose}>Cancel</Button>
+              <Button type="button" variant="ghost" onClick={onClose}>{t("common.cancel")}</Button>
               <Button
                 onClick={() => { setServerError(null); mutation.mutate(); }}
                 disabled={selectedFields.length === 0 || mutation.isPending}
               >
-                {mutation.isPending ? "Creating…" : "Create Index"}
+                {mutation.isPending ? t("collections.creating") : t("collections.createIndex")}
               </Button>
             </div>
           </motion.aside>
@@ -1638,6 +1629,8 @@ function AddIndexPanel({
 // ── Create Collection dialog ──────────────────────────────────────────────────
 
 function CreateCollectionDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const { t } = useTranslation();
+  const createCollectionSchema = useMemo(() => buildCreateCollectionSchema(t), [t]);
   const queryClient = useQueryClient();
   const {
     register,
@@ -1670,7 +1663,7 @@ function CreateCollectionDialog({ open, onClose }: { open: boolean; onClose: () 
         <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-2xl bg-white dark:bg-slate-900 p-6 shadow-glass-lg animate-slide-up">
           <div className="flex items-center justify-between">
             <Dialog.Title className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-              New Collection
+              {t("collections.newCollection")}
             </Dialog.Title>
             <button
               onClick={onClose}
@@ -1684,16 +1677,16 @@ function CreateCollectionDialog({ open, onClose }: { open: boolean; onClose: () 
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="mb-1.5 block text-xs font-medium text-slate-700 dark:text-slate-200">
-                  Name <span className="text-red-400">*</span>
+                  {t("common.name")} <span className="text-red-400">*</span>
                 </label>
                 <input {...register("name")} placeholder="blog_posts" className="input font-mono text-sm" />
                 {errors.name && <p className="mt-1 text-xs text-red-500 dark:text-red-400">{errors.name.message}</p>}
               </div>
               <div>
                 <label className="mb-1.5 block text-xs font-medium text-slate-700 dark:text-slate-200">
-                  Display Name <span className="text-red-400">*</span>
+                  {t("collections.displayName")} <span className="text-red-400">*</span>
                 </label>
-                <input {...register("display_name")} placeholder="Blog Posts" className="input" />
+                <input {...register("display_name")} placeholder={t("collections.placeholderBlogPosts")} className="input" />
                 {errors.display_name && (
                   <p className="mt-1 text-xs text-red-500 dark:text-red-400">{errors.display_name.message}</p>
                 )}
@@ -1701,24 +1694,24 @@ function CreateCollectionDialog({ open, onClose }: { open: boolean; onClose: () 
             </div>
 
             <div>
-              <label className="mb-1.5 block text-xs font-medium text-slate-700 dark:text-slate-200">Type</label>
+              <label className="mb-1.5 block text-xs font-medium text-slate-700 dark:text-slate-200">{t("collections.type")}</label>
               <Controller
                 control={control}
                 name="type"
                 render={({ field }) => (
                   <div className="flex gap-2">
-                    {(["base", "auth"] as const).map((t) => (
+                    {(["base", "auth"] as const).map((ct) => (
                       <button
-                        key={t}
+                        key={ct}
                         type="button"
-                        onClick={() => field.onChange(t)}
+                        onClick={() => field.onChange(ct)}
                         className={`flex-1 rounded-xl border py-2.5 text-sm font-medium capitalize transition ${
-                          field.value === t
+                          field.value === ct
                             ? "border-brand-400 bg-brand-50 dark:bg-brand-500/15 text-brand-700 dark:text-brand-300"
                             : "border-slate-200 dark:border-white/10 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-white/5"
                         }`}
                       >
-                        {t}
+                        {t(`collections.typeOption.${ct}`)}
                       </button>
                     ))}
                   </div>
@@ -1727,7 +1720,7 @@ function CreateCollectionDialog({ open, onClose }: { open: boolean; onClose: () 
             </div>
 
             <div>
-              <label className="mb-1.5 block text-xs font-medium text-slate-700 dark:text-slate-200">Color</label>
+              <label className="mb-1.5 block text-xs font-medium text-slate-700 dark:text-slate-200">{t("collections.color")}</label>
               <div className="flex flex-wrap gap-2">
                 {PRESET_COLORS.map((c) => (
                   <button
@@ -1746,11 +1739,11 @@ function CreateCollectionDialog({ open, onClose }: { open: boolean; onClose: () 
             </div>
 
             <div>
-              <label className="mb-1.5 block text-xs font-medium text-slate-700 dark:text-slate-200">Note</label>
+              <label className="mb-1.5 block text-xs font-medium text-slate-700 dark:text-slate-200">{t("collections.note")}</label>
               <textarea
                 {...register("note")}
                 rows={2}
-                placeholder="Short description…"
+                placeholder={t("collections.placeholderShortDescription")}
                 className="input resize-none"
               />
             </div>
@@ -1762,9 +1755,9 @@ function CreateCollectionDialog({ open, onClose }: { open: boolean; onClose: () 
             )}
 
             <div className="flex justify-end gap-2 pt-1">
-              <Button type="button" variant="ghost" onClick={onClose}>Cancel</Button>
+              <Button type="button" variant="ghost" onClick={onClose}>{t("common.cancel")}</Button>
               <Button type="submit" disabled={mutation.isPending}>
-                {mutation.isPending ? "Creating…" : "Create Collection"}
+                {mutation.isPending ? t("collections.creating") : t("collections.createCollection")}
               </Button>
             </div>
           </form>
@@ -1789,6 +1782,8 @@ function AddFieldPanel({
   existingFields: Field[];
   onClose: () => void;
 }) {
+  const { t } = useTranslation();
+  const createFieldSchema = useMemo(() => buildCreateFieldSchema(t), [t]);
   const queryClient = useQueryClient();
   const {
     register,
@@ -1891,7 +1886,7 @@ function AddFieldPanel({
             >
               <div className="flex shrink-0 items-center justify-between border-b border-slate-100 dark:border-white/10 px-6 py-5">
                 <div>
-                  <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">Add Field</h2>
+                  <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">{t("collections.addField")}</h2>
                   <p className="mt-0.5 text-xs text-slate-400">
                     {collectionName}
                     <span className="mx-1 text-slate-300">·</span>
@@ -1911,14 +1906,14 @@ function AddFieldPanel({
                 {/* Type grid */}
                 <div>
                   <label className="mb-3 block text-xs font-medium text-slate-700 dark:text-slate-200">
-                    Type <span className="text-red-400">*</span>
+                    {t("collections.type")} <span className="text-red-400">*</span>
                   </label>
                   <Controller
                     control={control}
                     name="type"
                     render={({ field }) => (
                       <div className="grid grid-cols-4 gap-2">
-                        {FIELD_TYPES.map(({ type, label, Icon, color }) => {
+                        {FIELD_TYPES.map(({ type, Icon, color }) => {
                           const active = field.value === type;
                           return (
                             <button
@@ -1934,7 +1929,7 @@ function AddFieldPanel({
                               <span className={`flex h-8 w-8 items-center justify-center rounded-lg ${active ? "bg-brand-100 dark:bg-brand-500/20" : color}`}>
                                 <Icon size={14} />
                               </span>
-                              <span className="leading-tight">{label}</span>
+                              <span className="leading-tight">{t(`collections.fieldType.${type}`)}</span>
                             </button>
                           );
                         })}
@@ -1947,19 +1942,19 @@ function AddFieldPanel({
                 {/* Key */}
                 <div>
                   <label className="mb-1.5 block text-xs font-medium text-slate-700 dark:text-slate-200">
-                    Key <span className="text-red-400">*</span>
+                    {t("collections.key")} <span className="text-red-400">*</span>
                   </label>
                   <input {...register("name")} placeholder="published_at" className="input font-mono text-sm" />
-                  <p className="mt-1 text-xs text-slate-400">Stored column name — snake_case, no spaces</p>
+                  <p className="mt-1 text-xs text-slate-400">{t("collections.keyHint")}</p>
                   {errors.name && <p className="mt-1 text-xs text-red-500 dark:text-red-400">{errors.name.message}</p>}
                 </div>
 
                 {/* Label */}
                 <div>
                   <label className="mb-1.5 block text-xs font-medium text-slate-700 dark:text-slate-200">
-                    Label <span className="text-red-400">*</span>
+                    {t("collections.label")} <span className="text-red-400">*</span>
                   </label>
-                  <input {...register("display_name")} placeholder="Published At" className="input" />
+                  <input {...register("display_name")} placeholder={t("collections.placeholderPublishedAt")} className="input" />
                   {errors.display_name && <p className="mt-1 text-xs text-red-500 dark:text-red-400">{errors.display_name.message}</p>}
                 </div>
 
@@ -1967,13 +1962,13 @@ function AddFieldPanel({
                 <div className="space-y-3 rounded-xl border border-slate-100 dark:border-white/10 bg-slate-50 dark:bg-white/5 px-4 py-4">
                   {(
                     [
-                      { key: "required",      label: "Required",      desc: "Field must have a value when creating items" },
-                      { key: "unique",        label: "Unique",        desc: "No two items can share the same value" },
-                      { key: "hidden",        label: "Hidden",        desc: "Hidden from the content editor; set via API or auto-generate" },
-                      { key: "show_in_table", label: "Show in table", desc: "Show as a column on the content list table" },
-                      { key: "quick_edit",    label: "Quick edit",    desc: "Show in the quick-edit aside panel on the content list" },
-                      { key: "readonly",      label: "Read-only",     desc: "Value is set on create but cannot be updated afterwards" },
-                      { key: "translatable",  label: "Translatable",  desc: "Marks this field for per-language content (metadata only — i18n storage TBD)" },
+                      { key: "required",      label: t("common.required"),             desc: t("collections.flagDesc.required") },
+                      { key: "unique",        label: t("collections.unique"),          desc: t("collections.flagDesc.unique") },
+                      { key: "hidden",        label: t("collections.hidden"),          desc: t("collections.flagDesc.hidden") },
+                      { key: "show_in_table", label: t("collections.flag.show_in_table"), desc: t("collections.flagDesc.show_in_table") },
+                      { key: "quick_edit",    label: t("collections.flag.quick_edit"),    desc: t("collections.flagDesc.quick_edit") },
+                      { key: "readonly",      label: t("collections.flag.readonly"),      desc: t("collections.flagDesc.readonly") },
+                      { key: "translatable",  label: t("collections.flag.translatable"),  desc: t("collections.flagDesc.translatable") },
                     ] as const
                   ).map(({ key, label, desc }) => (
                     <label key={key} className="flex cursor-pointer items-start gap-3">
@@ -1993,21 +1988,21 @@ function AddFieldPanel({
                 {/* Auto-generate */}
                 <div className="rounded-xl border border-slate-100 dark:border-white/10 bg-slate-50 dark:bg-white/5 px-4 py-4 space-y-4">
                   <div>
-                    <p className="text-xs font-medium text-slate-700 dark:text-slate-200 mb-0.5">Auto-generate</p>
+                    <p className="text-xs font-medium text-slate-700 dark:text-slate-200 mb-0.5">{t("collections.autoGenerate")}</p>
                     <p className="text-xs text-slate-400">
-                      The server will compute this field's value automatically on save.
+                      {t("collections.autoGenHintAdd")}
                     </p>
                   </div>
 
                   {/* Function selector */}
                   <div>
-                    <label className="mb-1.5 block text-xs font-medium text-slate-600 dark:text-slate-300">Function</label>
+                    <label className="mb-1.5 block text-xs font-medium text-slate-600 dark:text-slate-300">{t("collections.function")}</label>
                     <select
                       value={autoGenFn}
                       onChange={(e) => handleFnSelect(e.target.value)}
                       className="w-full rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2 text-sm text-slate-800 dark:text-slate-100 focus:border-brand-400 dark:focus:border-brand-500/60 focus:outline-none focus:ring-2 focus:ring-brand-100 dark:focus:ring-brand-500/20"
                     >
-                      <option value="">— none —</option>
+                      <option value="">{t("collections.noneOption")}</option>
                       {autoGenFunctions.map((f) => (
                         <option key={f.id} value={f.id}>{f.label}</option>
                       ))}
@@ -2021,14 +2016,14 @@ function AddFieldPanel({
                   {autoGenFn && selectedFnDef?.needs_source_field && (
                     <div>
                       <label className="mb-1.5 block text-xs font-medium text-slate-600 dark:text-slate-300">
-                        Source field <span className="text-red-400">*</span>
+                        {t("collections.sourceField")} <span className="text-red-400">*</span>
                       </label>
                       <select
                         value={autoGenSource}
                         onChange={(e) => setAutoGenSource(e.target.value)}
                         className="w-full rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2 text-sm text-slate-800 dark:text-slate-100 focus:border-brand-400 dark:focus:border-brand-500/60 focus:outline-none focus:ring-2 focus:ring-brand-100 dark:focus:ring-brand-500/20"
                       >
-                        <option value="">— choose a field —</option>
+                        <option value="">{t("collections.chooseField")}</option>
                         {existingFields
                           .filter((f) => !f.is_system)
                           .map((f) => (
@@ -2038,7 +2033,7 @@ function AddFieldPanel({
                           ))}
                       </select>
                       <p className="mt-1 text-xs text-slate-400">
-                        The function reads this field's value to compute the result.
+                        {t("collections.sourceFieldHint")}
                       </p>
                     </div>
                   )}
@@ -2046,20 +2041,20 @@ function AddFieldPanel({
                   {/* Trigger */}
                   {autoGenFn && (
                     <div>
-                      <label className="mb-1.5 block text-xs font-medium text-slate-600 dark:text-slate-300">Trigger</label>
+                      <label className="mb-1.5 block text-xs font-medium text-slate-600 dark:text-slate-300">{t("collections.trigger")}</label>
                       <div className="flex gap-2">
-                        {(["create", "always"] as const).map((t) => (
+                        {(["create", "always"] as const).map((tr) => (
                           <button
-                            key={t}
+                            key={tr}
                             type="button"
-                            onClick={() => setAutoGenTrigger(t)}
+                            onClick={() => setAutoGenTrigger(tr)}
                             className={`flex-1 rounded-lg border py-2 text-xs font-medium transition ${
-                              autoGenTrigger === t
+                              autoGenTrigger === tr
                                 ? "border-brand-400 bg-brand-50 dark:bg-brand-500/15 text-brand-700 dark:text-brand-300"
                                 : "border-slate-200 dark:border-white/10 text-slate-500 dark:text-slate-400 hover:bg-white dark:hover:bg-white/10"
                             }`}
                           >
-                            {t === "create" ? "On create only" : "On create & update"}
+                            {tr === "create" ? t("collections.triggerCreate") : t("collections.triggerAlways")}
                           </button>
                         ))}
                       </div>
@@ -2075,7 +2070,7 @@ function AddFieldPanel({
               </div>
 
               <div className="flex shrink-0 items-center justify-end gap-2 border-t border-slate-100 dark:border-white/10 px-6 py-4">
-                <Button type="button" variant="ghost" onClick={onClose}>Cancel</Button>
+                <Button type="button" variant="ghost" onClick={onClose}>{t("common.cancel")}</Button>
                 <Button
                   type="submit"
                   disabled={
@@ -2084,7 +2079,7 @@ function AddFieldPanel({
                     (!!autoGenFn && !!selectedFnDef?.needs_source_field && !autoGenSource)
                   }
                 >
-                  {mutation.isPending ? "Adding…" : "Add Field"}
+                  {mutation.isPending ? t("collections.adding") : t("collections.addField")}
                 </Button>
               </div>
             </form>
@@ -2110,6 +2105,7 @@ function EditFieldPanel({
   collectionName: string;
   onClose: () => void;
 }) {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const fieldKey = field.id;
 
@@ -2218,7 +2214,7 @@ function EditFieldPanel({
   });
 
   const isSelect = field.type === "select" || field.type === "multiselect";
-  const typeConfig = FIELD_TYPES.find((t) => t.type === field.type);
+  const typeConfig = FIELD_TYPES.find((ft) => ft.type === field.type);
 
   const panel = (
     <AnimatePresence>
@@ -2240,7 +2236,7 @@ function EditFieldPanel({
             {/* Header */}
             <div className="flex shrink-0 items-center justify-between border-b border-slate-100 dark:border-white/10 px-6 py-5">
               <div>
-                <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">Edit Field</h2>
+                <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">{t("collections.editField")}</h2>
                 <div className="mt-1 flex items-center gap-2">
                   <span className="font-mono text-xs text-slate-400">{field.name}</span>
                   {typeConfig && (
@@ -2263,13 +2259,13 @@ function EditFieldPanel({
               {/* Label */}
               <div>
                 <label className="mb-1.5 block text-xs font-medium text-slate-700 dark:text-slate-200">
-                  Label <span className="text-red-400">*</span>
+                  {t("collections.label")} <span className="text-red-400">*</span>
                 </label>
                 <input
                   className="input"
                   value={displayName}
                   onChange={(e) => setDisplayName(e.target.value)}
-                  placeholder="Display Name"
+                  placeholder={t("collections.placeholderDisplayName")}
                 />
               </div>
 
@@ -2277,13 +2273,13 @@ function EditFieldPanel({
               <div className="space-y-3 rounded-xl border border-slate-100 dark:border-white/10 bg-slate-50 dark:bg-white/5 px-4 py-4">
                 {(
                   [
-                    { key: "required",      label: "Required",      desc: "Field must have a value when creating items",                              value: required,     set: setRequired },
-                    { key: "unique",        label: "Unique",        desc: "No two items can share the same value (applies DDL constraint)",           value: unique,       set: setUnique },
-                    { key: "hidden",        label: "Hidden",        desc: "Hidden from the content editor; set via API or auto-generate",             value: hidden,       set: setHidden },
-                    { key: "show_in_table", label: "Show in table", desc: "Show as a column on the content list table",                               value: showInTable,  set: setShowInTable },
-                    { key: "quick_edit",    label: "Quick edit",    desc: "Show in the quick-edit aside panel on the content list",                   value: quickEdit,    set: setQuickEdit },
-                    { key: "readonly",      label: "Read-only",     desc: "Value is set on create but cannot be updated afterwards",                  value: readonly,     set: setReadonly },
-                    { key: "translatable",  label: "Translatable",  desc: "Marks this field for per-language content (metadata — i18n storage TBD)", value: translatable, set: setTranslatable },
+                    { key: "required",      label: t("common.required"),                desc: t("collections.flagDesc.required"),          value: required,     set: setRequired },
+                    { key: "unique",        label: t("collections.unique"),             desc: t("collections.flagDescEdit.unique"),        value: unique,       set: setUnique },
+                    { key: "hidden",        label: t("collections.hidden"),             desc: t("collections.flagDesc.hidden"),            value: hidden,       set: setHidden },
+                    { key: "show_in_table", label: t("collections.flag.show_in_table"), desc: t("collections.flagDesc.show_in_table"),     value: showInTable,  set: setShowInTable },
+                    { key: "quick_edit",    label: t("collections.flag.quick_edit"),    desc: t("collections.flagDesc.quick_edit"),        value: quickEdit,    set: setQuickEdit },
+                    { key: "readonly",      label: t("collections.flag.readonly"),      desc: t("collections.flagDesc.readonly"),          value: readonly,     set: setReadonly },
+                    { key: "translatable",  label: t("collections.flag.translatable"),  desc: t("collections.flagDescEdit.translatable"),  value: translatable, set: setTranslatable },
                   ] as const
                 ).map(({ key, label, desc, value, set }) => (
                   <label key={key} className="flex cursor-pointer items-start gap-3">
@@ -2305,7 +2301,7 @@ function EditFieldPanel({
               {field.type === "relation" && (
                 <div>
                   <label className="mb-1.5 block text-xs font-medium text-slate-700 dark:text-slate-200">
-                    Display Field
+                    {t("collections.displayField")}
                   </label>
                   {relationFields.length > 0 ? (
                     <select
@@ -2313,7 +2309,7 @@ function EditFieldPanel({
                       value={displayField}
                       onChange={(e) => setDisplayField(e.target.value)}
                     >
-                      <option value="">— auto (first text field) —</option>
+                      <option value="">{t("collections.autoFirstText")}</option>
                       {relationFields.map((f) => (
                         <option key={f.id} value={f.name}>
                           {f.display_name} ({f.name})
@@ -2322,11 +2318,11 @@ function EditFieldPanel({
                     </select>
                   ) : (
                     <p className="text-xs text-slate-400">
-                      {relRelatedCollection ? "Loading related fields…" : "No related collection configured"}
+                      {relRelatedCollection ? t("collections.loadingRelated") : t("collections.noRelatedConfigured")}
                     </p>
                   )}
                   <p className="mt-1 text-xs text-slate-400">
-                    Which field of “{relRelatedCollection || "the related collection"}” to show as the label instead of the UUID
+                    {t("collections.displayFieldHint", { name: relRelatedCollection || t("collections.relatedCollectionFallback") })}
                   </p>
                 </div>
               )}
@@ -2334,7 +2330,7 @@ function EditFieldPanel({
               {/* Choices — select / multiselect only */}
               {isSelect && (
                 <div>
-                  <p className="mb-2 text-xs font-medium text-slate-700 dark:text-slate-200">Choices</p>
+                  <p className="mb-2 text-xs font-medium text-slate-700 dark:text-slate-200">{t("collections.choices")}</p>
                   <div className="space-y-1.5">
                     {choices.map((c, i) => (
                       <div key={i} className="flex items-center gap-2">
@@ -2342,13 +2338,13 @@ function EditFieldPanel({
                           className="input flex-1 font-mono text-xs"
                           value={c.value}
                           onChange={(e) => setChoices((prev) => prev.map((x, j) => j === i ? { ...x, value: e.target.value } : x))}
-                          placeholder="value"
+                          placeholder={t("collections.placeholderValue")}
                         />
                         <input
                           className="input flex-1 text-xs"
                           value={c.label}
                           onChange={(e) => setChoices((prev) => prev.map((x, j) => j === i ? { ...x, label: e.target.value } : x))}
-                          placeholder="Label"
+                          placeholder={t("collections.placeholderLabel")}
                         />
                         <button
                           type="button"
@@ -2362,9 +2358,9 @@ function EditFieldPanel({
                   </div>
                   <div className="mt-2 flex items-center gap-2">
                     <input className="input flex-1 font-mono text-xs" value={newValue}
-                      onChange={(e) => setNewValue(e.target.value)} placeholder="value" />
+                      onChange={(e) => setNewValue(e.target.value)} placeholder={t("collections.placeholderValue")} />
                     <input className="input flex-1 text-xs" value={newLabel}
-                      onChange={(e) => setNewLabel(e.target.value)} placeholder="Label"
+                      onChange={(e) => setNewLabel(e.target.value)} placeholder={t("collections.placeholderLabel")}
                       onKeyDown={(e) => {
                         if (e.key === "Enter" && newValue && newLabel) {
                           e.preventDefault();
@@ -2380,26 +2376,26 @@ function EditFieldPanel({
                       <Plus size={13} />
                     </button>
                   </div>
-                  <p className="mt-1.5 text-xs text-slate-400">Press Enter or + to add a choice.</p>
+                  <p className="mt-1.5 text-xs text-slate-400">{t("collections.choicesHint")}</p>
                 </div>
               )}
 
               {/* Auto-generate */}
               <div className="rounded-xl border border-slate-100 dark:border-white/10 bg-slate-50 dark:bg-white/5 px-4 py-4 space-y-4">
                 <div>
-                  <p className="text-xs font-medium text-slate-700 dark:text-slate-200 mb-0.5">Auto-generate</p>
+                  <p className="text-xs font-medium text-slate-700 dark:text-slate-200 mb-0.5">{t("collections.autoGenerate")}</p>
                   <p className="text-xs text-slate-400">
-                    Server computes this field automatically on save.
+                    {t("collections.autoGenHintEdit")}
                   </p>
                 </div>
                 <div>
-                  <label className="mb-1.5 block text-xs font-medium text-slate-600 dark:text-slate-300">Function</label>
+                  <label className="mb-1.5 block text-xs font-medium text-slate-600 dark:text-slate-300">{t("collections.function")}</label>
                   <select
                     value={autoGenFn}
                     onChange={(e) => { setAutoGenFn(e.target.value); if (e.target.value) setHidden(true); }}
                     className="w-full rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2 text-sm text-slate-800 dark:text-slate-100 focus:border-brand-400 dark:focus:border-brand-500/60 focus:outline-none focus:ring-2 focus:ring-brand-100 dark:focus:ring-brand-500/20"
                   >
-                    <option value="">— none —</option>
+                    <option value="">{t("collections.noneOption")}</option>
                     {autoGenFunctions.map((f) => (
                       <option key={f.id} value={f.id}>{f.label}</option>
                     ))}
@@ -2411,14 +2407,14 @@ function EditFieldPanel({
                 {autoGenFn && selectedFnDef?.needs_source_field && (
                   <div>
                     <label className="mb-1.5 block text-xs font-medium text-slate-600 dark:text-slate-300">
-                      Source field <span className="text-red-400">*</span>
+                      {t("collections.sourceField")} <span className="text-red-400">*</span>
                     </label>
                     <select
                       value={autoGenSource}
                       onChange={(e) => setAutoGenSource(e.target.value)}
                       className="w-full rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2 text-sm text-slate-800 dark:text-slate-100 focus:border-brand-400 dark:focus:border-brand-500/60 focus:outline-none focus:ring-2 focus:ring-brand-100 dark:focus:ring-brand-500/20"
                     >
-                      <option value="">— choose a field —</option>
+                      <option value="">{t("collections.chooseField")}</option>
                       {existingFields.map((f) => (
                         <option key={f.id} value={f.name}>{f.display_name} ({f.name})</option>
                       ))}
@@ -2427,17 +2423,17 @@ function EditFieldPanel({
                 )}
                 {autoGenFn && (
                   <div>
-                    <label className="mb-1.5 block text-xs font-medium text-slate-600 dark:text-slate-300">Trigger</label>
+                    <label className="mb-1.5 block text-xs font-medium text-slate-600 dark:text-slate-300">{t("collections.trigger")}</label>
                     <div className="flex gap-2">
-                      {(["create", "always"] as const).map((t) => (
-                        <button key={t} type="button" onClick={() => setAutoGenTrigger(t)}
+                      {(["create", "always"] as const).map((tr) => (
+                        <button key={tr} type="button" onClick={() => setAutoGenTrigger(tr)}
                           className={`flex-1 rounded-lg border py-2 text-xs font-medium transition ${
-                            autoGenTrigger === t
+                            autoGenTrigger === tr
                               ? "border-brand-400 bg-brand-50 dark:bg-brand-500/15 text-brand-700 dark:text-brand-300"
                               : "border-slate-200 dark:border-white/10 text-slate-500 dark:text-slate-400 hover:bg-white dark:hover:bg-white/10"
                           }`}
                         >
-                          {t === "create" ? "On create only" : "On create & update"}
+                          {tr === "create" ? t("collections.triggerCreate") : t("collections.triggerAlways")}
                         </button>
                       ))}
                     </div>
@@ -2455,7 +2451,7 @@ function EditFieldPanel({
 
             {/* Footer */}
             <div className="flex shrink-0 items-center justify-end gap-2 border-t border-slate-100 dark:border-white/10 px-6 py-4">
-              <Button type="button" variant="ghost" onClick={onClose}>Cancel</Button>
+              <Button type="button" variant="ghost" onClick={onClose}>{t("common.cancel")}</Button>
               <Button
                 onClick={() => mutation.mutate()}
                 disabled={
@@ -2464,7 +2460,7 @@ function EditFieldPanel({
                   (!!autoGenFn && !!selectedFnDef?.needs_source_field && !autoGenSource)
                 }
               >
-                {mutation.isPending ? "Saving…" : "Save Changes"}
+                {mutation.isPending ? t("common.saving") : t("collections.saveChanges")}
               </Button>
             </div>
           </motion.aside>
@@ -2491,6 +2487,7 @@ function ConfirmDialog({
   loading?: boolean;
   danger?: boolean;
 }) {
+  const { t } = useTranslation();
   return (
     <Dialog.Root open={open} onOpenChange={(v) => !v && onCancel()}>
       <Dialog.Portal>
@@ -2499,7 +2496,7 @@ function ConfirmDialog({
           <Dialog.Title className="text-base font-semibold text-slate-900 dark:text-slate-100">{title}</Dialog.Title>
           <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">{description}</p>
           <div className="mt-5 flex justify-end gap-2">
-            <Button variant="ghost" onClick={onCancel} disabled={loading}>Cancel</Button>
+            <Button variant="ghost" onClick={onCancel} disabled={loading}>{t("common.cancel")}</Button>
             <button
               onClick={onConfirm}
               disabled={loading}
@@ -2507,7 +2504,7 @@ function ConfirmDialog({
                 danger ? "bg-red-500 hover:bg-red-600" : "bg-brand-600 hover:bg-brand-700"
               }`}
             >
-              {loading ? "Deleting…" : confirmLabel}
+              {loading ? t("common.deleting") : confirmLabel}
             </button>
           </div>
         </Dialog.Content>

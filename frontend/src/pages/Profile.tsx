@@ -4,9 +4,11 @@
  */
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CheckCircle2, KeyRound, User } from "lucide-react";
+import { useTranslation } from "react-i18next";
+import { CheckCircle2, KeyRound, Languages, User } from "lucide-react";
 import { get, patch, post } from "@/lib/api";
 import { useAuthStore } from "@/store/auth.store";
+import { setUILanguage, SUPPORTED_LANGUAGES, type UILanguage } from "@/lib/i18n";
 import { Card, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import {
@@ -16,7 +18,13 @@ import {
 import { initials } from "@/lib/utils";
 import type { User as CmsUser } from "@/types";
 
+const UI_LANGUAGE_LABELS: Record<UILanguage, string> = {
+  en: "English",
+  es: "Español",
+};
+
 export default function ProfilePage() {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const updateUser = useAuthStore((s) => s.updateUser);
   const languages = useAvailableLanguages();
@@ -29,6 +37,7 @@ export default function ProfilePage() {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [language, setLanguage] = useState("en");
+  const [uiLanguage, setUiLanguage] = useState<UILanguage>("en");
   const [profileSaved, setProfileSaved] = useState(false);
 
   const [password, setPassword] = useState("");
@@ -41,6 +50,8 @@ export default function ProfilePage() {
     setFirstName(me.first_name);
     setLastName(me.last_name);
     setLanguage(me.language || languages[0] || "en");
+    const ui = (me.ui_language || "").slice(0, 2).toLowerCase();
+    setUiLanguage((SUPPORTED_LANGUAGES as readonly string[]).includes(ui) ? (ui as UILanguage) : "en");
   }, [me, languages]);
 
   const profileMut = useMutation({
@@ -48,6 +59,7 @@ export default function ProfilePage() {
       first_name: string;
       last_name: string;
       language: string;
+      ui_language: string;
     }) => patch<CmsUser>("/users/me", body),
     onSuccess: (updated) => {
       queryClient.setQueryData(["users", "me"], updated);
@@ -55,8 +67,11 @@ export default function ProfilePage() {
         first_name: updated.first_name,
         last_name: updated.last_name,
         language: updated.language,
+        ui_language: updated.ui_language,
         avatar: updated.avatar,
       });
+      // Apply the new interface language immediately.
+      if (updated.ui_language) setUILanguage(uiLanguage);
       setProfileSaved(true);
       window.setTimeout(() => setProfileSaved(false), 2000);
     },
@@ -79,6 +94,7 @@ export default function ProfilePage() {
       first_name: firstName.trim(),
       last_name: lastName.trim(),
       language,
+      ui_language: uiLanguage,
     });
   }
 
@@ -86,11 +102,11 @@ export default function ProfilePage() {
     e.preventDefault();
     setPwdError(null);
     if (password.length < 8) {
-      setPwdError("Password must be at least 8 characters.");
+      setPwdError(t("profile.passwordTooShort"));
       return;
     }
     if (password !== confirm) {
-      setPwdError("Passwords do not match.");
+      setPwdError(t("profile.passwordMismatch"));
       return;
     }
     passwordMut.mutate(password);
@@ -101,10 +117,10 @@ export default function ProfilePage() {
       <div className="space-y-5">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">
-            My Profile
+            {t("profile.title")}
           </h1>
           <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-            Loading…
+            {t("common.loading")}
           </p>
         </div>
       </div>
@@ -117,10 +133,10 @@ export default function ProfilePage() {
     <div className="mx-auto space-y-5">
       <div>
         <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">
-          My Profile
+          {t("profile.title")}
         </h1>
         <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-          Update your name, language, and password. No admin permission required.
+          {t("profile.subtitle")}
         </p>
       </div>
 
@@ -140,7 +156,7 @@ export default function ProfilePage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
             <User size={16} className="text-slate-400" />
-            Profile
+            {t("profile.sectionProfile")}
           </CardTitle>
         </CardHeader>
 
@@ -148,7 +164,7 @@ export default function ProfilePage() {
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label className="mb-1.5 block text-xs font-medium text-slate-700 dark:text-slate-200">
-                First name
+                {t("profile.firstName")}
               </label>
               <input
                 className="input"
@@ -160,7 +176,7 @@ export default function ProfilePage() {
             </div>
             <div>
               <label className="mb-1.5 block text-xs font-medium text-slate-700 dark:text-slate-200">
-                Last name
+                {t("profile.lastName")}
               </label>
               <input
                 className="input"
@@ -174,7 +190,7 @@ export default function ProfilePage() {
 
           <div>
             <label className="mb-1.5 block text-xs font-medium text-slate-700 dark:text-slate-200">
-              Email
+              {t("common.email")}
             </label>
             <input
               className="input opacity-70"
@@ -183,13 +199,13 @@ export default function ProfilePage() {
               readOnly
             />
             <p className="mt-1 text-[11px] text-slate-400">
-              Email cannot be changed here.
+              {t("profile.emailLocked")}
             </p>
           </div>
 
           <div>
             <label className="mb-1.5 block text-xs font-medium text-slate-700 dark:text-slate-200">
-              Language
+              {t("profile.contentLanguage")}
             </label>
             <LanguageSelector
               value={language}
@@ -200,6 +216,32 @@ export default function ProfilePage() {
                   : [language, ...languages]
               }
             />
+            <p className="mt-1 text-[11px] text-slate-400">
+              {t("profile.contentLanguageHint")}
+            </p>
+          </div>
+
+          <div>
+            <label className="mb-1.5 block text-xs font-medium text-slate-700 dark:text-slate-200">
+              {t("profile.interfaceLanguage")}
+            </label>
+            <div className="flex items-center gap-2 rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-1.5">
+              <Languages size={13} className="shrink-0 text-slate-400" />
+              <select
+                value={uiLanguage}
+                onChange={(e) => setUiLanguage(e.target.value as UILanguage)}
+                className="appearance-none bg-transparent text-sm font-medium text-slate-700 dark:text-slate-200 focus:outline-none"
+              >
+                {SUPPORTED_LANGUAGES.map((lng) => (
+                  <option key={lng} value={lng}>
+                    {UI_LANGUAGE_LABELS[lng]}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <p className="mt-1 text-[11px] text-slate-400">
+              {t("profile.interfaceLanguageHint")}
+            </p>
           </div>
 
           {profileMut.isError && (
@@ -212,11 +254,11 @@ export default function ProfilePage() {
             {profileSaved && (
               <span className="flex items-center gap-1.5 text-xs font-medium text-emerald-600 dark:text-emerald-400">
                 <CheckCircle2 size={14} />
-                Saved
+                {t("common.saved")}
               </span>
             )}
             <Button type="submit" disabled={profileMut.isPending}>
-              {profileMut.isPending ? "Saving…" : "Save profile"}
+              {profileMut.isPending ? t("common.saving") : t("profile.saveProfile")}
             </Button>
           </div>
         </form>
@@ -227,14 +269,14 @@ export default function ProfilePage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
               <KeyRound size={16} className="text-slate-400" />
-              Password
+              {t("profile.sectionPassword")}
             </CardTitle>
           </CardHeader>
 
           <form onSubmit={handlePasswordSubmit} className="space-y-4">
             <div>
               <label className="mb-1.5 block text-xs font-medium text-slate-700 dark:text-slate-200">
-                New password
+                {t("profile.newPassword")}
               </label>
               <input
                 type="password"
@@ -249,12 +291,12 @@ export default function ProfilePage() {
                 required
               />
               <p className="mt-1 text-[11px] text-slate-400">
-                Minimum 8 characters.
+                {t("profile.passwordHint")}
               </p>
             </div>
             <div>
               <label className="mb-1.5 block text-xs font-medium text-slate-700 dark:text-slate-200">
-                Confirm new password
+                {t("profile.confirmPassword")}
               </label>
               <input
                 type="password"
@@ -280,11 +322,11 @@ export default function ProfilePage() {
               {pwdSaved && (
                 <span className="flex items-center gap-1.5 text-xs font-medium text-emerald-600 dark:text-emerald-400">
                   <CheckCircle2 size={14} />
-                  Password updated
+                  {t("profile.passwordUpdated")}
                 </span>
               )}
               <Button type="submit" disabled={passwordMut.isPending}>
-                {passwordMut.isPending ? "Updating…" : "Update password"}
+                {passwordMut.isPending ? t("common.updating") : t("profile.updatePassword")}
               </Button>
             </div>
           </form>
@@ -294,7 +336,7 @@ export default function ProfilePage() {
       {!showPassword && (
         <Card>
           <p className="text-sm text-slate-500 dark:text-slate-400">
-            Your account uses SSO. Password is managed by your identity provider.
+            {t("profile.ssoNote")}
           </p>
         </Card>
       )}

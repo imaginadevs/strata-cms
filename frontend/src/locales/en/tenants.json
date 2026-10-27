@@ -1,0 +1,32 @@
+{
+  "tenants": {
+    "superActive": "Super-admin mode active",
+    "superInactive": "Super-admin mode inactive from your IP",
+    "superRestricted": "Tenant management is restricted to super admins connecting from an allowed IP. The server sees your IP as <code>{{ip}}</code>.",
+    "unknown": "unknown",
+    "allowed": "Allowed:",
+    "superAllowlistNote": "The allowlist is set via <mono>SUPER_ADMIN_ALLOWED_IPS</mono> in the server environment and can't be changed from here. Add your IP there (then re-log in) to manage tenants.",
+    "superOnlyTitle": "Super-admin only",
+    "superOnlyDesc": "Managing tenants requires a super-admin account. To change your own tenant's branding or plugins, use Settings.",
+    "title": "Tenants",
+    "count_one": "{{count}} tenant",
+    "count_other": "{{count}} tenants",
+    "newTenant": "New tenant",
+    "editTenant": "Edit tenant",
+    "domain": "Domain",
+    "empty": "No tenants yet.",
+    "platform": "Platform",
+    "platformTitle": "Platform tenant — owns the super-admin account",
+    "platformNoDelete": "The platform tenant can't be deleted",
+    "deleteTitle": "Delete tenant?",
+    "deleteDesc": "This removes <b>{{name}}</b> from the tenant list. Its data schema is left intact on the database and must be dropped separately.",
+    "slugHintEdit": "The slug can't be changed after creation.",
+    "slugHintNew": "Used for login and identification. Auto-generated from the name.",
+    "domainHint": "The host that resolves to this tenant. Use <mono>localhost</mono> for the local dev tenant.",
+    "defaultLanguage": "Default language",
+    "activeHint": "Disabled tenants return 403 on every request.",
+    "provisionHint": "Creating a tenant provisions its schema, base tables and a seed admin (<mono>admin@{{host}}</mono>, password <mono>admin</mono>) automatically.",
+    "saveChanges": "Save changes",
+    "createTenant": "Create tenant"
+  }
+}

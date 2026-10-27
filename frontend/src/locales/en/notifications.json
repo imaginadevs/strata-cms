@@ -1,0 +1,6 @@
+{
+  "notifications": {
+    "ariaUnread": "Notifications, {{n}} unread",
+    "unreadCount": "{{n}} unread"
+  }
+}

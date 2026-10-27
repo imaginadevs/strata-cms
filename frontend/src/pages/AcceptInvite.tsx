@@ -8,12 +8,14 @@
 import { useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { KeyRound, AlertTriangle } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { post } from "@/lib/api";
 import { Button } from "@/components/ui/Button";
 import { useAuthStore } from "@/store/auth.store";
 import type { TokenResponse } from "@/types";
 
 export default function AcceptInvitePage() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const setSession = useAuthStore((s) => s.setSession);
 
@@ -26,15 +28,15 @@ export default function AcceptInvitePage() {
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    if (password.length < 8) { setError("Password must be at least 8 characters."); return; }
-    if (password !== confirm) { setError("Passwords don't match."); return; }
+    if (password.length < 8) { setError(t("auth.passwordMinLength")); return; }
+    if (password !== confirm) { setError(t("auth.passwordsDontMatch")); return; }
     setSubmitting(true);
     try {
       const res = await post<TokenResponse>("/auth/accept-invite", { token, password });
       setSession(res);
       navigate({ to: "/" });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not accept the invitation.");
+      setError(err instanceof Error ? err.message : t("auth.acceptFailed"));
     } finally {
       setSubmitting(false);
     }
@@ -47,26 +49,26 @@ export default function AcceptInvitePage() {
           <span className="mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-brand-600 text-white">
             <KeyRound size={20} />
           </span>
-          <h1 className="text-lg font-bold text-slate-900 dark:text-slate-100">Accept your invitation</h1>
-          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Choose a password to activate your account.</p>
+          <h1 className="text-lg font-bold text-slate-900 dark:text-slate-100">{t("auth.acceptTitle")}</h1>
+          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{t("auth.acceptSubtitle")}</p>
         </div>
 
         {!token ? (
           <div className="flex items-start gap-2 rounded-xl bg-red-50 px-3 py-2.5 text-sm text-red-600 dark:bg-red-500/10 dark:text-red-400">
             <AlertTriangle size={15} className="mt-0.5 shrink-0" />
-            This invitation link is missing its token. Ask an admin to resend the invite.
+            {t("auth.missingToken")}
           </div>
         ) : (
           <form onSubmit={submit} className="space-y-4">
             <div>
-              <label className="mb-1.5 block text-xs font-medium text-slate-700 dark:text-slate-200">New password</label>
+              <label className="mb-1.5 block text-xs font-medium text-slate-700 dark:text-slate-200">{t("auth.newPassword")}</label>
               <input className="input" type="password" value={password} onChange={(e) => setPassword(e.target.value)}
-                placeholder="At least 8 characters" autoComplete="new-password" autoFocus />
+                placeholder={t("auth.atLeast8")} autoComplete="new-password" autoFocus />
             </div>
             <div>
-              <label className="mb-1.5 block text-xs font-medium text-slate-700 dark:text-slate-200">Confirm password</label>
+              <label className="mb-1.5 block text-xs font-medium text-slate-700 dark:text-slate-200">{t("auth.confirmPassword")}</label>
               <input className="input" type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)}
-                placeholder="Re-enter password" autoComplete="new-password" />
+                placeholder={t("auth.reenterPassword")} autoComplete="new-password" />
             </div>
             {error && (
               <div className="flex items-start gap-2 rounded-xl bg-red-50 px-3 py-2.5 text-sm text-red-600 dark:bg-red-500/10 dark:text-red-400">
@@ -74,7 +76,7 @@ export default function AcceptInvitePage() {
               </div>
             )}
             <Button type="submit" className="w-full" loading={submitting} disabled={!password || !confirm}>
-              Activate account
+              {t("auth.activateAccount")}
             </Button>
           </form>
         )}

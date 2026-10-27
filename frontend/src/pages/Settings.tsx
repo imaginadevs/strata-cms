@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useTranslation, Trans } from "react-i18next";
 import {
   BookOpen,
   CheckCircle2,
@@ -59,6 +60,17 @@ const ALL_LANGUAGES = [
 
 export type LanguageCode = typeof ALL_LANGUAGES[number]["code"];
 
+/** Localized display name for a language code (falls back to the English name). */
+function languageLabel(code: string, fallback: string, locale: string): string {
+  try {
+    const label = new Intl.DisplayNames([locale], { type: "language" }).of(code);
+    if (label && label !== code) return label.charAt(0).toLocaleUpperCase(locale) + label.slice(1);
+  } catch {
+    /* unsupported locale / code — use the fallback */
+  }
+  return fallback;
+}
+
 // ── Language selector card ────────────────────────────────────────────────────
 function LanguagesCard({
   currentLanguages,
@@ -69,6 +81,7 @@ function LanguagesCard({
   defaultLanguage: string;
   onSave: (langs: string[]) => Promise<unknown>;
 }) {
+  const { t, i18n } = useTranslation();
   const [selected, setSelected] = useState<Set<string>>(new Set(currentLanguages));
   const [search, setSearch] = useState("");
   const [saving, setSaving] = useState(false);
@@ -81,6 +94,7 @@ function LanguagesCard({
   const visible = ALL_LANGUAGES.filter(
     (l) =>
       l.name.toLowerCase().includes(search.toLowerCase()) ||
+      languageLabel(l.code, l.name, i18n.language).toLowerCase().includes(search.toLowerCase()) ||
       l.code.toLowerCase().includes(search.toLowerCase())
   );
 
@@ -116,12 +130,11 @@ function LanguagesCard({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Languages</CardTitle>
+        <CardTitle>{t("settings.languagesTitle")}</CardTitle>
       </CardHeader>
       <div className="space-y-4">
         <p className="text-xs text-slate-500 dark:text-slate-400">
-          Choose which languages editors can assign to content. At least one must be
-          selected. These appear in the language selector when creating or editing items.
+          {t("settings.languagesDesc")}
         </p>
 
         {/* Search */}
@@ -130,7 +143,7 @@ function LanguagesCard({
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search languages…"
+            placeholder={t("settings.searchLanguages")}
             className="input pl-8 text-xs"
           />
         </div>
@@ -143,7 +156,7 @@ function LanguagesCard({
             return (
               <label
                 key={lang.code}
-                title={isDefault ? "Default language — cannot be removed" : undefined}
+                title={isDefault ? t("settings.defaultLangTitle") : undefined}
                 className={`flex items-center gap-2.5 rounded-lg border px-3 py-2 transition ${
                   isDefault ? "cursor-default" : "cursor-pointer"
                 } ${
@@ -163,7 +176,7 @@ function LanguagesCard({
                   {lang.code}
                 </span>
                 <span className={`truncate text-xs ${active ? "text-brand-800 dark:text-brand-200" : "text-slate-600 dark:text-slate-300"}`}>
-                  {lang.name}
+                  {languageLabel(lang.code, lang.name, i18n.language)}
                 </span>
               </label>
             );
@@ -172,15 +185,15 @@ function LanguagesCard({
 
         <div className="flex items-center gap-3 pt-1">
           <Button onClick={handleSave} disabled={!hasChanges || saving}>
-            {saving ? "Saving…" : "Save languages"}
+            {saving ? t("common.saving") : t("settings.saveLanguages")}
           </Button>
           {saved && (
             <span className="flex items-center gap-1.5 text-sm text-emerald-600 dark:text-emerald-300">
-              <CheckCircle2 size={14} /> Saved
+              <CheckCircle2 size={14} /> {t("common.saved")}
             </span>
           )}
           <span className="text-xs text-slate-400">
-            {selected.size} language{selected.size !== 1 ? "s" : ""} selected
+            {t("settings.languagesSelected", { count: selected.size })}
           </span>
         </div>
       </div>
@@ -195,6 +208,7 @@ const PLUGIN_ICONS: Record<string, React.ElementType> = {
 };
 
 function PluginsCard() {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const { tenant, setTenant } = useTenantStore();
   const [lastResult, setLastResult] = useState<PluginInstallResponse["result"] | null>(
@@ -225,23 +239,23 @@ function PluginsCard() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Plugins</CardTitle>
+        <CardTitle>{t("settings.pluginsTitle")}</CardTitle>
       </CardHeader>
       <div className="space-y-3">
         <p className="text-xs text-slate-500 dark:text-slate-400">
-          Install a plugin to provision its system collections (e.g.{" "}
-          <span className="font-mono">website_pages</span>,{" "}
-          <span className="font-mono">blog_posts</span>). Already-present
-          collections are skipped. Install is idempotent.
+          <Trans
+            i18nKey="settings.pluginsDesc"
+            components={{ mono: <span className="font-mono" /> }}
+          />
         </p>
 
         {isLoading && (
-          <p className="py-6 text-center text-sm text-slate-400">Loading plugins…</p>
+          <p className="py-6 text-center text-sm text-slate-400">{t("settings.loadingPlugins")}</p>
         )}
 
         {!isLoading && plugins.length === 0 && (
           <p className="rounded-xl border border-dashed border-slate-200 px-4 py-8 text-center text-sm text-slate-400 dark:border-white/10">
-            No plugins are available for this tenant.
+            {t("settings.noPlugins")}
           </p>
         )}
 
@@ -270,9 +284,9 @@ function PluginsCard() {
                     {plugin.name}
                   </p>
                   {plugin.installed ? (
-                    <span className="badge badge-blue">Installed</span>
+                    <span className="badge badge-blue">{t("settings.installed")}</span>
                   ) : (
-                    <span className="badge badge-gray">Not installed</span>
+                    <span className="badge badge-gray">{t("settings.notInstalled")}</span>
                   )}
                 </div>
                 <p className="mt-0.5 text-xs text-slate-400">{plugin.description}</p>
@@ -300,10 +314,10 @@ function PluginsCard() {
                 className="shrink-0"
               >
                 {installing
-                  ? "Installing…"
+                  ? t("settings.installing")
                   : plugin.installed
-                    ? "Reinstall"
-                    : "Install"}
+                    ? t("settings.reinstall")
+                    : t("settings.install")}
               </Button>
             </div>
           );
@@ -319,18 +333,18 @@ function PluginsCard() {
           <div className="rounded-xl border border-emerald-200/80 bg-emerald-50/80 px-3 py-2.5 text-xs text-emerald-900 dark:border-emerald-500/25 dark:bg-emerald-500/10 dark:text-emerald-100">
             <p className="flex items-center gap-1.5 font-semibold">
               <CheckCircle2 size={14} />
-              Installed {lastResult.plugin}
+              {t("settings.installedResult", { plugin: lastResult.plugin })}
             </p>
             <ul className="mt-1.5 space-y-0.5 text-emerald-800/90 dark:text-emerald-100/80">
               <li>
-                Created:{" "}
+                {t("settings.created")}{" "}
                 {lastResult.collections_created.length
                   ? lastResult.collections_created.join(", ")
-                  : "none"}
+                  : t("common.none").toLowerCase()}
               </li>
               {lastResult.collections_omitted.length > 0 && (
                 <li>
-                  Skipped:{" "}
+                  {t("settings.skipped")}{" "}
                   {lastResult.collections_omitted
                     .map((o) => `${o.name} (${o.reason})`)
                     .join("; ")}
@@ -338,12 +352,12 @@ function PluginsCard() {
               )}
               {lastResult.relations_created.length > 0 && (
                 <li>
-                  Relations created: {lastResult.relations_created.join(", ")}
+                  {t("settings.relationsCreated")} {lastResult.relations_created.join(", ")}
                 </li>
               )}
               {lastResult.relations_omitted.length > 0 && (
                 <li>
-                  Relations skipped:{" "}
+                  {t("settings.relationsSkipped")}{" "}
                   {lastResult.relations_omitted
                     .map((o) => `${o.name} (${o.reason})`)
                     .join("; ")}
@@ -359,6 +373,7 @@ function PluginsCard() {
 
 // ── Settings page ─────────────────────────────────────────────────────────────
 export default function SettingsPage() {
+  const { t, i18n } = useTranslation();
   const { tenant, setTenant } = useTenantStore();
   const queryClient = useQueryClient();
 
@@ -422,19 +437,19 @@ export default function SettingsPage() {
   return (
     <div className="space-y-5 max-w-2xl">
       <div>
-        <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Settings</h1>
-        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Tenant and system configuration</p>
+        <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">{t("settings.title")}</h1>
+        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{t("settings.subtitle")}</p>
       </div>
 
       {/* General */}
       <Card>
         <CardHeader>
-          <CardTitle>General</CardTitle>
+          <CardTitle>{t("settings.general")}</CardTitle>
         </CardHeader>
         <div className="space-y-4">
           <div>
             <label className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-200">
-              Tenant Name
+              {t("settings.tenantName")}
             </label>
             <input
               value={generalName}
@@ -444,7 +459,7 @@ export default function SettingsPage() {
           </div>
           <div>
             <label className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-200">
-              Default Language
+              {t("settings.defaultLanguage")}
             </label>
             <select
               value={generalLang}
@@ -453,13 +468,12 @@ export default function SettingsPage() {
             >
               {ALL_LANGUAGES.map((l) => (
                 <option key={l.code} value={l.code}>
-                  {l.code.toUpperCase()} — {l.name}
+                  {l.code.toUpperCase()} — {languageLabel(l.code, l.name, i18n.language)}
                 </option>
               ))}
             </select>
             <p className="mt-1 text-xs text-slate-400">
-              Used as the fallback language for content and the UI.
-              Saving will automatically add it to the enabled languages list.
+              {t("settings.defaultLanguageHint")}
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -467,15 +481,15 @@ export default function SettingsPage() {
               onClick={() => saveGeneralMutation.mutate()}
               disabled={!generalChanged || saveGeneralMutation.isPending}
             >
-              {saveGeneralMutation.isPending ? "Saving…" : "Save changes"}
+              {saveGeneralMutation.isPending ? t("common.saving") : t("settings.saveChanges")}
             </Button>
             {generalSaved && (
               <span className="flex items-center gap-1.5 text-sm text-emerald-600 dark:text-emerald-300">
-                <CheckCircle2 size={14} /> Saved
+                <CheckCircle2 size={14} /> {t("common.saved")}
               </span>
             )}
             {saveGeneralMutation.isError && (
-              <span className="text-sm text-red-500 dark:text-red-400">Save failed</span>
+              <span className="text-sm text-red-500 dark:text-red-400">{t("settings.saveFailed")}</span>
             )}
           </div>
         </div>
@@ -496,11 +510,11 @@ export default function SettingsPage() {
       {/* SSO */}
       <Card>
         <CardHeader>
-          <CardTitle>Single Sign-On (Logto)</CardTitle>
+          <CardTitle>{t("settings.ssoTitle")}</CardTitle>
         </CardHeader>
         <div className="space-y-4">
           <div>
-            <label className="mb-1.5 block text-xs font-medium text-slate-600 dark:text-slate-300">Logto Endpoint</label>
+            <label className="mb-1.5 block text-xs font-medium text-slate-600 dark:text-slate-300">{t("settings.logtoEndpoint")}</label>
             <input
               placeholder="https://your-tenant.logto.app"
               className="input text-xs"
@@ -508,15 +522,15 @@ export default function SettingsPage() {
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="mb-1.5 block text-xs font-medium text-slate-600 dark:text-slate-300">App ID</label>
+              <label className="mb-1.5 block text-xs font-medium text-slate-600 dark:text-slate-300">{t("settings.appId")}</label>
               <input className="input text-xs" />
             </div>
             <div>
-              <label className="mb-1.5 block text-xs font-medium text-slate-600 dark:text-slate-300">App Secret</label>
+              <label className="mb-1.5 block text-xs font-medium text-slate-600 dark:text-slate-300">{t("settings.appSecret")}</label>
               <input type="password" className="input text-xs" />
             </div>
           </div>
-          <Button>Save SSO config</Button>
+          <Button>{t("settings.saveSso")}</Button>
         </div>
       </Card>
     </div>
@@ -538,6 +552,7 @@ const emptyStorage: TenantStorageSettings = {
 };
 
 function StorageSettingsCard() {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const { data } = useQuery({
     queryKey: ["settings"],
@@ -578,7 +593,7 @@ function StorageSettingsCard() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>File Storage (S3)</CardTitle>
+        <CardTitle>{t("settings.storageTitle")}</CardTitle>
       </CardHeader>
       <div className="space-y-4">
         {/* Inherit default (env) credentials */}
@@ -598,16 +613,19 @@ function StorageSettingsCard() {
           />
           <div className="min-w-0">
             <p className="text-sm font-medium text-slate-800 dark:text-slate-100">
-              Inherit the default credentials
+              {t("settings.inheritTitle")}
             </p>
             {env?.configured ? (
               <p className="text-xs text-slate-400">
-                Use the server's default S3 (<span className="font-mono">{env.bucket}</span>). Files are
-                stored under <span className="font-mono">tenants/&#123;tenant_id&#125;/…</span>.
+                <Trans
+                  i18nKey="settings.inheritDesc"
+                  values={{ bucket: env.bucket }}
+                  components={{ mono: <span className="font-mono" /> }}
+                />
               </p>
             ) : (
               <p className="text-xs text-slate-400">
-                No default S3 is configured on the server — enter this tenant's own credentials below.
+                {t("settings.noDefaultS3")}
               </p>
             )}
           </div>
@@ -617,38 +635,38 @@ function StorageSettingsCard() {
         {!form.inherit && (
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className={labelCls}>Endpoint</label>
+              <label className={labelCls}>{t("settings.endpoint")}</label>
               <input className={inputCls} placeholder="https://s3.wasabisys.com"
                 value={form.endpoint} onChange={(e) => set({ endpoint: e.target.value })} />
             </div>
             <div>
-              <label className={labelCls}>Region</label>
+              <label className={labelCls}>{t("settings.region")}</label>
               <input className={inputCls} placeholder="us-east-1"
                 value={form.region} onChange={(e) => set({ region: e.target.value })} />
             </div>
             <div>
-              <label className={labelCls}>Bucket</label>
+              <label className={labelCls}>{t("settings.bucket")}</label>
               <input className={inputCls} placeholder="my-tenant-bucket"
                 value={form.bucket} onChange={(e) => set({ bucket: e.target.value })} />
             </div>
             <div>
-              <label className={labelCls}>Access Key ID</label>
+              <label className={labelCls}>{t("settings.accessKeyId")}</label>
               <input className={inputCls} placeholder="AKIA…"
                 value={form.access_key_id} onChange={(e) => set({ access_key_id: e.target.value })} />
             </div>
             <div className="col-span-2">
-              <label className={labelCls}>Secret Access Key</label>
+              <label className={labelCls}>{t("settings.secretAccessKey")}</label>
               <input className={inputCls} type="password"
-                placeholder={secretSet ? "•••••••• (unchanged)" : ""}
+                placeholder={secretSet ? t("settings.secretUnchanged") : ""}
                 value={form.secret_key ?? ""} onChange={(e) => set({ secret_key: e.target.value })} />
             </div>
             <div>
-              <label className={labelCls}>Public base URL (optional)</label>
+              <label className={labelCls}>{t("settings.publicBaseUrl")}</label>
               <input className={inputCls} placeholder="https://cdn.example.com"
                 value={form.public_base_url} onChange={(e) => set({ public_base_url: e.target.value })} />
             </div>
             <div>
-              <label className={labelCls}>CDN base URL (optional)</label>
+              <label className={labelCls}>{t("settings.cdnBaseUrl")}</label>
               <input className={inputCls} placeholder="https://images.example.com"
                 value={form.cdn_base_url} onChange={(e) => set({ cdn_base_url: e.target.value })} />
             </div>
@@ -656,14 +674,14 @@ function StorageSettingsCard() {
               <input type="checkbox" checked={form.force_path_style}
                 onChange={(e) => set({ force_path_style: e.target.checked })}
                 className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-400 dark:border-white/10" />
-              Force path-style addressing (required for MinIO)
+              {t("settings.forcePathStyle")}
             </label>
           </div>
         )}
 
         <div className="flex items-center gap-3">
-          <Button onClick={() => saveMut.mutate()} loading={saveMut.isPending}>Save storage config</Button>
-          {saved && <span className="text-xs text-emerald-600 dark:text-emerald-300">Saved</span>}
+          <Button onClick={() => saveMut.mutate()} loading={saveMut.isPending}>{t("settings.saveStorage")}</Button>
+          {saved && <span className="text-xs text-emerald-600 dark:text-emerald-300">{t("common.saved")}</span>}
         </div>
       </div>
     </Card>

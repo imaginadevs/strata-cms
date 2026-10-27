@@ -1,0 +1,19 @@
+{
+  "audit": {
+    "title": "Registro de auditoría",
+    "subtitle": "Todos los cambios en tu CMS",
+    "operation": "Operación",
+    "collection": "Colección",
+    "user": "Usuario",
+    "changedFields": "Campos modificados",
+    "date": "Fecha",
+    "system": "sistema",
+    "op": {
+      "create": "crear",
+      "update": "actualizar",
+      "delete": "eliminar",
+      "login": "inicio de sesión",
+      "logout": "cierre de sesión"
+    }
+  }
+}

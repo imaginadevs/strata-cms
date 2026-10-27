@@ -145,6 +145,7 @@ func NewRouter(ctx context.Context, cfg *config.Config, log *logger.Logger, db *
 				rest.MountWorkflows(r, repos, wfEngine, log)
 			}
 			rest.MountSettings(r, repos, cfg, enc, log)
+			rest.MountSuperAdmin(r, cfg, log)
 			rest.MountPlugins(r, repos, bus, log)
 			rest.MountFiles(r, repos, storageFactory, cfg, enc, log)
 			rest.MountAPITokens(r, repos, log)

@@ -119,11 +119,17 @@ type SuperAdminConfig struct {
 	// Empty slice means super-admin login is completely disabled.
 	AllowedIPs []string
 
-	// Email + Password are used exactly once: on first start when no super
-	// admin exists yet. After bootstrap the password env var can be removed.
-	// The account is NOT re-created or updated on subsequent starts.
+	// Email + Password seed the platform super-admin account on startup. The
+	// account lives in the platform tenant's schema. The password is used only
+	// to CREATE the account; an existing account is never re-passworded, so the
+	// password env var can be removed after first start.
 	Email    string
 	Password string
+
+	// PlatformDomain, when set, is applied to the platform tenant's `domain` on
+	// startup so the super-admin can sign in at that host in production. Leave
+	// empty to keep the platform tenant's existing domain (e.g. localhost in dev).
+	PlatformDomain string
 }
 
 func Load() *Config {
@@ -207,6 +213,7 @@ func Load() *Config {
 	cfg.SuperAdmin.AllowedIPs = splitList(v.GetString("SUPER_ADMIN_ALLOWED_IPS"))
 	cfg.SuperAdmin.Email = v.GetString("SUPER_ADMIN_EMAIL")
 	cfg.SuperAdmin.Password = v.GetString("SUPER_ADMIN_PASSWORD")
+	cfg.SuperAdmin.PlatformDomain = v.GetString("PLATFORM_DOMAIN")
 
 	return cfg
 }

@@ -1,18 +1,20 @@
 import { Database, Users, ScrollText, Activity } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { get } from "@/lib/api";
 import { Card, CardHeader, CardTitle } from "@/components/ui/Card";
 import { duration, easing } from "@/lib/motion";
 import type { Collection, User, AuditLog, PaginatedResponse } from "@/types";
 
 const stats = [
-  { label: "Collections", icon: Database,   gradient: "from-blue-500 to-indigo-500",     key: "collections" },
-  { label: "Users",       icon: Users,      gradient: "from-emerald-500 to-teal-500",    key: "users" },
-  { label: "Audit logs",  icon: ScrollText, gradient: "from-amber-500 to-orange-500",    key: "audit" },
-  { label: "Active now",  icon: Activity,   gradient: "from-fuchsia-500 to-purple-500",  key: "active" },
+  { labelKey: "dashboard.collections", icon: Database,   gradient: "from-blue-500 to-indigo-500",     key: "collections" },
+  { labelKey: "dashboard.users",       icon: Users,      gradient: "from-emerald-500 to-teal-500",    key: "users" },
+  { labelKey: "dashboard.auditLogs",   icon: ScrollText, gradient: "from-amber-500 to-orange-500",    key: "audit" },
+  { labelKey: "dashboard.activeNow",   icon: Activity,   gradient: "from-fuchsia-500 to-purple-500",  key: "active" },
 ] as const;
 
 export default function DashboardPage() {
+  const { t } = useTranslation();
   // Use the same queryFn shape as Collections.tsx so the shared cache is always Collection[].
   const { data: collections = [] } = useQuery({
     queryKey: ["collections"],
@@ -40,15 +42,15 @@ export default function DashboardPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Dashboard</h1>
+        <h1 className="text-2xl font-bold text-slate-900 dark:text-white">{t("dashboard.title")}</h1>
         <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-          Overview of your CMS instance
+          {t("dashboard.subtitle")}
         </p>
       </div>
 
       {/* Stat cards */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        {stats.map(({ label, icon: Icon, gradient, key }, i) => (
+        {stats.map(({ labelKey, icon: Icon, gradient, key }, i) => (
           <Card
             key={key}
             interactive
@@ -63,7 +65,7 @@ export default function DashboardPage() {
             </div>
             <div>
               <p className="text-2xl font-bold text-slate-900 dark:text-white">{counts[key]}</p>
-              <p className="text-xs text-slate-500 dark:text-slate-400">{label}</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400">{t(labelKey)}</p>
             </div>
           </Card>
         ))}
@@ -73,7 +75,7 @@ export default function DashboardPage() {
         {/* Recent collections */}
         <Card transition={{ duration: duration.base, ease: easing.out, delay: 0.24 }}>
           <CardHeader>
-            <CardTitle>Collections</CardTitle>
+            <CardTitle>{t("dashboard.collections")}</CardTitle>
           </CardHeader>
           {collections.slice(0, 5).map((c) => (
             <div
@@ -88,19 +90,19 @@ export default function DashboardPage() {
                 <p className="text-xs text-slate-400">{c.name}</p>
               </div>
               <span className={`badge ml-auto ${c.is_system ? "badge-gray" : "badge-blue"}`}>
-                {c.is_system ? "system" : c.type}
+                {c.is_system ? t("dashboard.system") : c.type}
               </span>
             </div>
           ))}
           {!collections.length && (
-            <p className="py-4 text-center text-sm text-slate-400">No collections yet</p>
+            <p className="py-4 text-center text-sm text-slate-400">{t("dashboard.noCollections")}</p>
           )}
         </Card>
 
         {/* Recent audit */}
         <Card transition={{ duration: duration.base, ease: easing.out, delay: 0.3 }}>
           <CardHeader>
-            <CardTitle>Recent Activity</CardTitle>
+            <CardTitle>{t("dashboard.recentActivity")}</CardTitle>
           </CardHeader>
           {audit?.data?.slice(0, 6).map((log) => (
             <div
@@ -113,19 +115,19 @@ export default function DashboardPage() {
                 : log.operation === "login" ? "badge-blue"
                 : "badge-amber"
               }`}>
-                {log.operation}
+                {t(`audit.op.${log.operation}`, { defaultValue: log.operation })}
               </span>
               <div className="min-w-0">
                 <p className="truncate text-sm text-slate-700 dark:text-slate-300">
                   {log.collection}
                   {log.item_id ? ` #${log.item_id.slice(0, 8)}` : ""}
                 </p>
-                <p className="text-xs text-slate-400">{log.user_email ?? "system"}</p>
+                <p className="text-xs text-slate-400">{log.user_email ?? t("dashboard.system")}</p>
               </div>
             </div>
           ))}
           {!audit?.data?.length && (
-            <p className="py-4 text-center text-sm text-slate-400">No activity yet</p>
+            <p className="py-4 text-center text-sm text-slate-400">{t("dashboard.noActivity")}</p>
           )}
         </Card>
       </div>

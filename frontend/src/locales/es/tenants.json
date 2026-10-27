@@ -1,0 +1,32 @@
+{
+  "tenants": {
+    "superActive": "Modo superadministrador activo",
+    "superInactive": "Modo superadministrador inactivo desde tu IP",
+    "superRestricted": "La gestión de inquilinos está restringida a superadministradores que se conecten desde una IP permitida. El servidor ve tu IP como <code>{{ip}}</code>.",
+    "unknown": "desconocida",
+    "allowed": "Permitidas:",
+    "superAllowlistNote": "La lista de IP permitidas se define mediante <mono>SUPER_ADMIN_ALLOWED_IPS</mono> en el entorno del servidor y no se puede cambiar desde aquí. Agrega tu IP allí (y vuelve a iniciar sesión) para gestionar inquilinos.",
+    "superOnlyTitle": "Solo superadministradores",
+    "superOnlyDesc": "Gestionar inquilinos requiere una cuenta de superadministrador. Para cambiar la marca o los plugins de tu propio inquilino, usa Ajustes.",
+    "title": "Inquilinos",
+    "count_one": "{{count}} inquilino",
+    "count_other": "{{count}} inquilinos",
+    "newTenant": "Nuevo inquilino",
+    "editTenant": "Editar inquilino",
+    "domain": "Dominio",
+    "empty": "Aún no hay inquilinos.",
+    "platform": "Plataforma",
+    "platformTitle": "Inquilino de plataforma: es propietario de la cuenta de superadministrador",
+    "platformNoDelete": "El inquilino de plataforma no se puede eliminar",
+    "deleteTitle": "¿Eliminar inquilino?",
+    "deleteDesc": "Esto elimina a <b>{{name}}</b> de la lista de inquilinos. Su esquema de datos permanece intacto en la base de datos y debe eliminarse por separado.",
+    "slugHintEdit": "El slug no se puede cambiar después de la creación.",
+    "slugHintNew": "Se usa para el inicio de sesión y la identificación. Se genera automáticamente a partir del nombre.",
+    "domainHint": "El host que corresponde a este inquilino. Usa <mono>localhost</mono> para el inquilino de desarrollo local.",
+    "defaultLanguage": "Idioma predeterminado",
+    "activeHint": "Los inquilinos deshabilitados devuelven 403 en cada solicitud.",
+    "provisionHint": "Al crear un inquilino se aprovisionan automáticamente su esquema, las tablas base y un administrador inicial (<mono>admin@{{host}}</mono>, contraseña <mono>admin</mono>).",
+    "saveChanges": "Guardar cambios",
+    "createTenant": "Crear inquilino"
+  }
+}

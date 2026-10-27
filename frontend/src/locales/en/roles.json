@@ -1,0 +1,28 @@
+{
+  "roles": {
+    "title": "Roles",
+    "subtitle": "Manage roles and collection permissions. Assign roles to users from the Users page.",
+    "role": "Role",
+    "type": "Type",
+    "systemBadge": "system",
+    "customBadge": "custom",
+    "permissions": "Permissions",
+    "noRolesFound": "No roles found",
+    "noPermissionTargets": "No permission targets",
+    "systemSection": "System",
+    "systemHint": "Admin surfaces (not content collections)",
+    "collectionsSection": "Collections",
+    "collectionsHint": "Content collections from your schema",
+    "allActionNotePrefix": "Action",
+    "allActionNoteSuffix": "grants every action on that target. Super-admins and the Administrator role bypass checks.",
+    "savePermissions": "Save permissions",
+    "target": "Target",
+    "action": {
+      "create": "Create",
+      "read": "Read",
+      "update": "Update",
+      "delete": "Delete",
+      "all": "All"
+    }
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "roles": {
+    "title": "Roles",
+    "subtitle": "Administra los roles y los permisos de colección. Asigna roles a los usuarios desde la página de Usuarios.",
+    "role": "Rol",
+    "type": "Tipo",
+    "systemBadge": "sistema",
+    "customBadge": "personalizado",
+    "permissions": "Permisos",
+    "noRolesFound": "No se encontraron roles",
+    "noPermissionTargets": "No hay destinos de permisos",
+    "systemSection": "Sistema",
+    "systemHint": "Superficies de administración (no colecciones de contenido)",
+    "collectionsSection": "Colecciones",
+    "collectionsHint": "Colecciones de contenido de tu esquema",
+    "allActionNotePrefix": "La acción",
+    "allActionNoteSuffix": "otorga todas las acciones sobre ese destino. Los superadministradores y el rol Administrador omiten las comprobaciones.",
+    "savePermissions": "Guardar permisos",
+    "target": "Destino",
+    "action": {
+      "create": "Crear",
+      "read": "Leer",
+      "update": "Actualizar",
+      "delete": "Eliminar",
+      "all": "Todas"
+    }
+  }
+}

@@ -2,23 +2,14 @@
  * Recursive editor for section visibility Condition trees.
  * Persist the JSON as-is — root is and/or group; children are nested groups or leaves.
  */
+import { useTranslation } from "react-i18next";
 import * as Select from "@radix-ui/react-select";
 import { ChevronDown, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import type { CondOp, Condition, Field } from "@/types";
 
-const OPS: { value: CondOp; label: string }[] = [
-  { value: "eq", label: "equals" },
-  { value: "neq", label: "not equals" },
-  { value: "gt", label: "greater than" },
-  { value: "gte", label: "≥" },
-  { value: "lt", label: "less than" },
-  { value: "lte", label: "≤" },
-  { value: "in", label: "in list" },
-  { value: "nin", label: "not in list" },
-  { value: "empty", label: "is empty" },
-  { value: "nempty", label: "is not empty" },
-  { value: "contains", label: "contains" },
+const OPS: CondOp[] = [
+  "eq", "neq", "gt", "gte", "lt", "lte", "in", "nin", "empty", "nempty", "contains",
 ];
 
 const NO_VALUE_OPS = new Set<CondOp>(["empty", "nempty"]);
@@ -91,6 +82,8 @@ function LeafEditor({
   onChange: (c: Condition) => void;
   onRemove?: () => void;
 }) {
+  const { t } = useTranslation();
+  const opOptions = OPS.map((op) => ({ value: op, label: t(`collections.op.${op}`) }));
   const needsValue = !NO_VALUE_OPS.has(condition.op);
   const isList = condition.op === "in" || condition.op === "nin";
   const valueStr = isList
@@ -106,7 +99,7 @@ function LeafEditor({
           value={condition.field}
           onChange={(field) => onChange({ ...condition, field })}
           options={fields.map((f) => ({ value: f.name, label: f.display_name || f.name }))}
-          placeholder="Field"
+          placeholder={t("collections.fieldPlaceholder")}
         />
       </div>
       <div className="w-[8.5rem]">
@@ -130,13 +123,13 @@ function LeafEditor({
               });
             }
           }}
-          options={OPS}
+          options={opOptions}
         />
       </div>
       {needsValue && (
         <input
           className="input h-9 min-w-[8rem] flex-1 text-xs"
-          placeholder={isList ? "a, b, c" : "Value"}
+          placeholder={isList ? "a, b, c" : t("collections.valuePlaceholder")}
           value={valueStr}
           onChange={(e) => {
             const raw = e.target.value;
@@ -157,7 +150,7 @@ function LeafEditor({
           type="button"
           onClick={onRemove}
           className="mt-1 rounded-lg p-1.5 text-slate-300 transition hover:bg-red-50 dark:hover:bg-red-500/10 hover:text-red-500"
-          title="Remove"
+          title={t("common.remove")}
         >
           <Trash2 size={13} />
         </button>
@@ -179,6 +172,7 @@ function GroupEditor({
   onRemove?: () => void;
   depth: number;
 }) {
+  const { t } = useTranslation();
   const kind = "and" in condition ? ("and" as const) : ("or" as const);
   const children: Condition[] =
     "and" in condition ? condition.and : condition.or;
@@ -205,7 +199,7 @@ function GroupEditor({
     >
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
-          Match
+          {t("collections.match")}
         </span>
         <div className="flex rounded-lg border border-slate-200 dark:border-white/10 p-0.5">
           {(["and", "or"] as const).map((k) => (
@@ -221,7 +215,7 @@ function GroupEditor({
                   : "text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5"
               }`}
             >
-              {k}
+              {t(`collections.logic.${k}`)}
             </button>
           ))}
         </div>
@@ -233,7 +227,7 @@ function GroupEditor({
             onClick={() => setChildren([...children, defaultLeaf(fields)])}
           >
             <Plus size={12} />
-            Rule
+            {t("collections.rule")}
           </Button>
           <Button
             type="button"
@@ -242,14 +236,14 @@ function GroupEditor({
             onClick={() => setChildren([...children, { and: [defaultLeaf(fields)] }])}
           >
             <Plus size={12} />
-            Group
+            {t("collections.group")}
           </Button>
           {onRemove && (
             <button
               type="button"
               onClick={onRemove}
               className="rounded-lg p-1.5 text-slate-300 transition hover:bg-red-50 dark:hover:bg-red-500/10 hover:text-red-500"
-              title="Remove group"
+              title={t("collections.removeGroup")}
             >
               <Trash2 size={13} />
             </button>
@@ -259,7 +253,7 @@ function GroupEditor({
 
       {children.length === 0 ? (
         <p className="py-2 text-center text-xs text-slate-400">
-          No rules — add a rule or nested group.
+          {t("collections.noRules")}
         </p>
       ) : (
         <div className="space-y-2">
@@ -267,7 +261,7 @@ function GroupEditor({
             <div key={i}>
               {i > 0 && (
                 <p className="mb-1.5 pl-1 text-[10px] font-semibold uppercase tracking-wide text-slate-300 dark:text-slate-500">
-                  {kind}
+                  {t(`collections.logic.${kind}`)}
                 </p>
               )}
               {isGroup(child) ? (
@@ -303,15 +297,16 @@ export function VisibilityEditor({
   onChange: (next: Condition | null) => void;
   fields: Field[];
 }) {
+  const { t } = useTranslation();
   const enabled = value != null;
 
   return (
     <div className="space-y-3">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-xs font-medium text-slate-700 dark:text-slate-200">Visibility</p>
+          <p className="text-xs font-medium text-slate-700 dark:text-slate-200">{t("collections.visibility")}</p>
           <p className="mt-0.5 text-[11px] text-slate-400">
-            When off, the section is always shown. When on, show only if the rules match.
+            {t("collections.visibilityHint")}
           </p>
         </div>
         <button
@@ -340,7 +335,7 @@ export function VisibilityEditor({
       {enabled && value && (
         fields.length === 0 ? (
           <p className="rounded-xl bg-amber-50 dark:bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
-            Add fields to this collection before configuring visibility rules.
+            {t("collections.visibilityNeedsFields")}
           </p>
         ) : isGroup(value) ? (
           <GroupEditor
